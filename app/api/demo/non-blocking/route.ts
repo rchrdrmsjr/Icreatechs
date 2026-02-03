@@ -2,6 +2,25 @@ import { inngest } from "@/inngest/client";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 
+// Helper function to extract URL from text
+function extractUrl(text: string): string | null {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const match = text.match(urlRegex);
+  return match ? match[0] : null;
+}
+
+// Helper function to check if web search is requested
+function shouldUseWebSearch(text: string): boolean {
+  const keywords = [
+    "use web search",
+    "search web",
+    "scrape",
+    "from website",
+    "from url",
+  ];
+  return keywords.some((keyword) => text.toLowerCase().includes(keyword));
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Parse the request body
@@ -19,7 +38,38 @@ export async function POST(request: NextRequest) {
     // Generate a unique request ID
     const requestId = randomUUID();
 
-    // Send event to Inngest (non-blocking)
+    // Check if web search is needed
+    const useWebSearch = shouldUseWebSearch(prompt);
+    const url = extractUrl(prompt);
+
+    if (useWebSearch && url) {
+      // Web search mode: Queue scrape and analyze job
+      const cleanPrompt = prompt
+        .replace(url, "")
+        .replace(/use web search|search web|scrape|from website|from url/gi, "")
+        .trim();
+
+      await inngest.send({
+        name: "ai/scrape.analyze",
+        data: {
+          url,
+          requestId,
+          aiProvider: "gemini",
+          analysisPrompt: cleanPrompt || undefined,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        mode: "web-search",
+        message: "Scrape and analyze job queued successfully",
+        requestId,
+        url,
+        note: "The scraping and AI analysis is running in the background. Check the Inngest dashboard or logs for results.",
+      });
+    }
+
+    // Normal mode: Queue regular AI generation
     await inngest.send({
       name: "ai/generate.text",
       data: {
@@ -31,6 +81,7 @@ export async function POST(request: NextRequest) {
     // Return immediately with request ID
     return NextResponse.json({
       success: true,
+      mode: "direct",
       message: "AI generation job queued successfully",
       requestId,
       note: "The AI generation is running in the background. Check the Inngest dashboard or logs for results.",
