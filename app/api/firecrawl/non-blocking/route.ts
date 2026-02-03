@@ -16,6 +16,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate formats
+    const allowedFormats = new Set([
+      "markdown",
+      "html",
+      "rawHtml",
+      "screenshot",
+      "links",
+    ]);
+    const isValidFormatsArray =
+      Array.isArray(formats) &&
+      formats.length > 0 &&
+      formats.every(
+        (format) => typeof format === "string" && allowedFormats.has(format),
+      );
+    if (!isValidFormatsArray) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid 'formats' value. It must be a non-empty array containing any of: markdown, html, rawHtml, screenshot, links.",
+        },
+        { status: 400 },
+      );
+    }
+
     // Generate a unique request ID
     const requestId = randomUUID();
 

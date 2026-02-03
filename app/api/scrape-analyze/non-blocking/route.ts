@@ -2,6 +2,8 @@ import { inngest } from "@/inngest/client";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 
+type AIProvider = "gemini" | "groq";
+
 export async function POST(request: NextRequest) {
   try {
     // Parse the request body
@@ -16,6 +18,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate and normalize aiProvider
+    const normalizedAiProvider =
+      typeof aiProvider === "string" ? aiProvider.toLowerCase() : aiProvider;
+
+    if (normalizedAiProvider !== "gemini" && normalizedAiProvider !== "groq") {
+      return NextResponse.json(
+        {
+          error: "Invalid aiProvider. Must be 'gemini' or 'groq'",
+          received: aiProvider,
+        },
+        { status: 400 },
+      );
+    }
+
     // Generate a unique request ID
     const requestId = randomUUID();
 
@@ -25,7 +41,7 @@ export async function POST(request: NextRequest) {
       data: {
         url,
         requestId,
-        aiProvider,
+        aiProvider: normalizedAiProvider as AIProvider,
         analysisPrompt,
       },
     });
@@ -36,7 +52,7 @@ export async function POST(request: NextRequest) {
       message: "Scrape and analyze job queued successfully",
       requestId,
       url,
-      aiProvider,
+      aiProvider: normalizedAiProvider,
       note: "The scraping and AI analysis is running in the background. Check the Inngest dashboard or logs for results.",
     });
   } catch (error) {

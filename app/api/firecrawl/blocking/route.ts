@@ -1,4 +1,4 @@
-import Firecrawl from "@mendable/firecrawl-js";
+import { firecrawl } from "@/lib/firecrawl";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -15,6 +15,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate formats
+    const allowedFormats = new Set([
+      "markdown",
+      "html",
+      "rawHtml",
+      "screenshot",
+      "links",
+    ]);
+    const isValidFormatsArray =
+      Array.isArray(formats) &&
+      formats.length > 0 &&
+      formats.every(
+        (format) => typeof format === "string" && allowedFormats.has(format),
+      );
+    if (!isValidFormatsArray) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid 'formats' value. It must be a non-empty array containing any of: markdown, html, rawHtml, screenshot, links.",
+        },
+        { status: 400 },
+      );
+    }
+
     // Check if API key is configured
     if (!process.env.FIRECRAWL_API_KEY) {
       return NextResponse.json(
@@ -22,11 +46,6 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
-
-    // Initialize Firecrawl
-    const firecrawl = new Firecrawl({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-    });
 
     // Scrape the URL
     const result = await firecrawl.scrape(url, {

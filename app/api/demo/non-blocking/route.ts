@@ -1,25 +1,7 @@
 import { inngest } from "@/inngest/client";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-
-// Helper function to extract URL from text
-function extractUrl(text: string): string | null {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const match = text.match(urlRegex);
-  return match ? match[0] : null;
-}
-
-// Helper function to check if web search is requested
-function shouldUseWebSearch(text: string): boolean {
-  const keywords = [
-    "use web search",
-    "search web",
-    "scrape",
-    "from website",
-    "from url",
-  ];
-  return keywords.some((keyword) => text.toLowerCase().includes(keyword));
-}
+import { extractUrl, shouldUseWebSearch } from "@/lib/web-search";
 
 export async function POST(request: NextRequest) {
   try {

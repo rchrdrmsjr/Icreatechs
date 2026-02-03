@@ -2,7 +2,7 @@ import { inngest } from "./client";
 import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
-import Firecrawl from "@mendable/firecrawl-js";
+import { firecrawl } from "@/lib/firecrawl";
 
 export const helloWorld = inngest.createFunction(
   { id: "hello-world" },
@@ -116,19 +116,33 @@ export const scrapeWebsite = inngest.createFunction(
         throw new Error("FIRECRAWL_API_KEY is not configured");
       }
 
-      const firecrawl = new Firecrawl({
-        apiKey: process.env.FIRECRAWL_API_KEY,
-      });
+      try {
+        const scrapeResult = await firecrawl.scrape(url, {
+          formats: formats,
+        });
 
-      const scrapeResult = await firecrawl.scrape(url, {
-        formats: formats,
-      });
+        // Validate scrape result has content
+        if (
+          !scrapeResult.markdown &&
+          !scrapeResult.html &&
+          !scrapeResult.rawHtml
+        ) {
+          throw new Error(
+            "Firecrawl returned no content in any requested format",
+          );
+        }
 
-      return {
-        ...scrapeResult,
-        sourceUrl: url,
-        scrapedAt: new Date().toISOString(),
-      };
+        return {
+          ...scrapeResult,
+          sourceUrl: url,
+          scrapedAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error(`Firecrawl scrape failed for ${url}:`, errorMessage);
+        throw new Error(`Failed to scrape URL: ${errorMessage}`);
+      }
     });
 
     // Step 3: Log completion
@@ -156,6 +170,13 @@ export const scrapeAndAnalyze = inngest.createFunction(
       analysisPrompt,
     } = event.data;
 
+    // Validate aiProvider
+    if (aiProvider !== "gemini" && aiProvider !== "groq") {
+      throw new Error(
+        `Invalid aiProvider: ${aiProvider}. Must be 'gemini' or 'groq'`,
+      );
+    }
+
     // Step 1: Scrape the URL with Firecrawl
     const scrapedData = await step.run("scrape-url", async () => {
       if (!process.env.FIRECRAWL_API_KEY) {
@@ -163,19 +184,32 @@ export const scrapeAndAnalyze = inngest.createFunction(
       }
 
       console.log(`Scraping URL for request: ${requestId}`);
-      const firecrawl = new Firecrawl({
-        apiKey: process.env.FIRECRAWL_API_KEY,
-      });
 
-      const scrapeResult = await firecrawl.scrape(url, {
-        formats: ["markdown"],
-      });
+      try {
+        const scrapeResult = await firecrawl.scrape(url, {
+          formats: ["markdown"],
+        });
 
-      return {
-        markdown: scrapeResult.markdown,
-        metadata: scrapeResult.metadata,
-        sourceUrl: url,
-      };
+        // Validate scrape result
+        if (!scrapeResult.markdown) {
+          throw new Error("Firecrawl returned no markdown content");
+        }
+
+        if (!scrapeResult.metadata) {
+          throw new Error("Firecrawl returned no metadata");
+        }
+
+        return {
+          markdown: scrapeResult.markdown,
+          metadata: scrapeResult.metadata,
+          sourceUrl: url,
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error(`Firecrawl scrape failed for ${url}:`, errorMessage);
+        throw new Error(`Failed to scrape URL: ${errorMessage}`);
+      }
     });
 
     // Step 2: Generate AI analysis

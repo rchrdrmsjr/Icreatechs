@@ -1,26 +1,8 @@
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { NextRequest, NextResponse } from "next/server";
-import Firecrawl from "@mendable/firecrawl-js";
-
-// Helper function to extract URL from text
-function extractUrl(text: string): string | null {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const match = text.match(urlRegex);
-  return match ? match[0] : null;
-}
-
-// Helper function to check if web search is requested
-function shouldUseWebSearch(text: string): boolean {
-  const keywords = [
-    "use web search",
-    "search web",
-    "scrape",
-    "from website",
-    "from url",
-  ];
-  return keywords.some((keyword) => text.toLowerCase().includes(keyword));
-}
+import { firecrawl } from "@/lib/firecrawl";
+import { extractUrl, shouldUseWebSearch } from "@/lib/web-search";
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,10 +40,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Scrape the URL
-      const firecrawl = new Firecrawl({
-        apiKey: process.env.FIRECRAWL_API_KEY,
-      });
-
       const scrapeResult = await firecrawl.scrape(url, {
         formats: ["markdown"],
       });

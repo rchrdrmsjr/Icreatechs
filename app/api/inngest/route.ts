@@ -8,7 +8,7 @@ import {
   scrapeAndAnalyze,
 } from "@/inngest/functions";
 
-// Create an API that serves zero functions
+// Serve Inngest functions: helloWorld, generateAIText, generateGroqText, scrapeWebsite, scrapeAndAnalyze
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [

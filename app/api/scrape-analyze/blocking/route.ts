@@ -1,8 +1,10 @@
-import Firecrawl from "@mendable/firecrawl-js";
+import { firecrawl } from "@/lib/firecrawl";
 import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 import { NextRequest, NextResponse } from "next/server";
+
+type AIProvider = "gemini" | "groq";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +20,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate and normalize aiProvider
+    const normalizedAiProvider =
+      typeof aiProvider === "string" ? aiProvider.toLowerCase() : aiProvider;
+
+    if (normalizedAiProvider !== "gemini" && normalizedAiProvider !== "groq") {
+      return NextResponse.json(
+        {
+          error: "Invalid aiProvider. Must be 'gemini' or 'groq'",
+          received: aiProvider,
+        },
+        { status: 400 },
+      );
+    }
+
     // Check if API keys are configured
     if (!process.env.FIRECRAWL_API_KEY) {
       return NextResponse.json(
@@ -26,14 +42,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (aiProvider === "groq" && !process.env.GROQ_API_KEY) {
+    if (normalizedAiProvider === "groq" && !process.env.GROQ_API_KEY) {
       return NextResponse.json(
         { error: "Groq API key is not configured" },
         { status: 500 },
       );
     }
 
-    if (aiProvider === "gemini" && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (
+      normalizedAiProvider === "gemini" &&
+      !process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    ) {
       return NextResponse.json(
         { error: "Google Generative AI API key is not configured" },
         { status: 500 },
@@ -41,13 +60,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Scrape the URL
-    const firecrawl = new Firecrawl({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-    });
-
     const scrapeResult = await firecrawl.scrape(url, {
       formats: ["markdown"],
     });
+
+    // Validate scrape result
+    if (!scrapeResult.markdown) {
+      return NextResponse.json(
+        { error: "Firecrawl returned no markdown content" },
+        { status: 422 },
+      );
+    }
+
+    if (!scrapeResult.metadata) {
+      return NextResponse.json(
+        { error: "Firecrawl returned no metadata" },
+        { status: 422 },
+      );
+    }
 
     // Step 2: Analyze with AI
     const prompt = analysisPrompt
@@ -55,7 +85,7 @@ export async function POST(request: NextRequest) {
       : `Please analyze and summarize the following content:\n\n${scrapeResult.markdown}`;
 
     let aiResult;
-    if (aiProvider === "groq") {
+    if (normalizedAiProvider === "groq") {
       const { text, usage, finishReason } = await generateText({
         model: groq("llama-3.3-70b-versatile"),
         prompt: prompt,
