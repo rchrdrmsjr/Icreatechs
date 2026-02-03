@@ -1,5 +1,6 @@
 import { inngest } from "./client";
 import { google } from "@ai-sdk/google";
+import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 
 export const helloWorld = inngest.createFunction(
@@ -42,6 +43,49 @@ export const generateAIText = inngest.createFunction(
     // Step 3: Log completion
     await step.run("log-completion", async () => {
       console.log(`Completed AI generation for request: ${requestId}`);
+      return { status: "completed" };
+    });
+
+    return {
+      requestId,
+      success: true,
+      data: result,
+    };
+  },
+);
+
+export const generateGroqText = inngest.createFunction(
+  { id: "generate-groq-text" },
+  { event: "ai/generate.groq" },
+  async ({ event, step }) => {
+    const { prompt, requestId } = event.data;
+
+    // Step 1: Log the start
+    await step.run("log-start", async () => {
+      console.log(`Starting Groq AI generation for request: ${requestId}`);
+      return { status: "started" };
+    });
+
+    // Step 2: Generate text using Groq (llama-3.3-70b-versatile)
+    const result = await step.run("generate-text-groq", async () => {
+      const { text, usage, finishReason } = await generateText({
+        model: groq("llama-3.3-70b-versatile"),
+        prompt: prompt,
+        temperature: 0.7,
+      });
+
+      return {
+        text,
+        usage,
+        finishReason,
+        model: "llama-3.3-70b-versatile",
+        provider: "groq",
+      };
+    });
+
+    // Step 3: Log completion
+    await step.run("log-completion", async () => {
+      console.log(`Completed Groq AI generation for request: ${requestId}`);
       return { status: "completed" };
     });
 
