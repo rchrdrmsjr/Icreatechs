@@ -3,6 +3,10 @@ import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 import { firecrawl } from "@/lib/firecrawl";
+import {
+  trackInngestError,
+  trackExternalServiceError,
+} from "@/lib/error-tracking";
 
 export const helloWorld = inngest.createFunction(
   { id: "hello-world" },
@@ -31,6 +35,12 @@ export const generateAIText = inngest.createFunction(
         model: google("gemini-2.5-flash"),
         prompt: prompt,
         temperature: 0.7,
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "inngest-gemini-background",
+          recordInputs: true,
+          recordOutputs: true,
+        },
       });
 
       return {
@@ -73,6 +83,12 @@ export const generateGroqText = inngest.createFunction(
         model: groq("llama-3.3-70b-versatile"),
         prompt: prompt,
         temperature: 0.7,
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "inngest-groq-background",
+          recordInputs: true,
+          recordOutputs: true,
+        },
       });
 
       return {
@@ -232,6 +248,12 @@ export const scrapeAndAnalyze = inngest.createFunction(
           model: groq("llama-3.3-70b-versatile"),
           prompt: prompt,
           temperature: 0.7,
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: "inngest-groq-scrape-analysis",
+            recordInputs: true,
+            recordOutputs: true,
+          },
         });
         text = result.text;
         usage = result.usage;
@@ -245,6 +267,12 @@ export const scrapeAndAnalyze = inngest.createFunction(
           model: google("gemini-2.5-flash"),
           prompt: prompt,
           temperature: 0.7,
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: "inngest-gemini-scrape-analysis",
+            recordInputs: true,
+            recordOutputs: true,
+          },
         });
         text = result.text;
         usage = result.usage;

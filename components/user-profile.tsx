@@ -3,6 +3,11 @@
 import * as React from "react";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
+import {
+  setUserContext,
+  clearUserContext,
+  captureInfo,
+} from "@/lib/sentry-logging";
 
 export function UserProfile({ isCollapsed }: { isCollapsed?: boolean }) {
   const supabase = React.useMemo(() => createClient(), []);
@@ -12,12 +17,53 @@ export function UserProfile({ isCollapsed }: { isCollapsed?: boolean }) {
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
+
+      // Set user context in Sentry when user is loaded
+      if (data.user) {
+        setUserContext({
+          id: data.user.id,
+          email: data.user.email || undefined,
+          username:
+            data.user.user_metadata?.full_name ||
+            data.user.user_metadata?.name ||
+            undefined,
+        });
+      }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+
+      // Update Sentry user context on auth state changes
+      if (session?.user) {
+        setUserContext({
+          id: session.user.id,
+          email: session.user.email || undefined,
+          username:
+            session.user.user_metadata?.full_name ||
+            session.user.user_metadata?.name ||
+            undefined,
+        });
+
+        // Log sign-in events
+        if (event === "SIGNED_IN") {
+          captureInfo("User signed in", {
+            tags: { action: "auth", event: "sign_in" },
+            extra: { provider: session.user.app_metadata?.provider },
+          });
+        }
+      } else {
+        // Clear user context on sign out
+        clearUserContext();
+
+        if (event === "SIGNED_OUT") {
+          captureInfo("User signed out", {
+            tags: { action: "auth", event: "sign_out" },
+          });
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
