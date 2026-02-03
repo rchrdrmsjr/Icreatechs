@@ -52,9 +52,15 @@ export default function SentryLoggingDemo() {
   // Example 3: Track API calls with automatic breadcrumbs
   const handleAPICall = async () => {
     try {
-      const response = await trackedFetch("/api/demo", {
+      const response = await trackedFetch("/api/demo/blocking", {
         method: "POST",
-        body: JSON.stringify({ test: "data" }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: "Hello! This is a test from the Sentry logging demo.",
+          useWebSearch: false,
+        }),
       });
 
       if (response.ok) {

@@ -6,6 +6,7 @@ import {
   trackExternalServiceError,
   trackPerformance,
 } from "@/lib/error-tracking";
+import { createTelemetryConfig } from "@/lib/telemetry-config";
 
 export async function POST(request: NextRequest) {
   return trackPerformance(
@@ -38,12 +39,7 @@ export async function POST(request: NextRequest) {
           model: groq("llama-3.3-70b-versatile"),
           prompt: prompt,
           temperature: 0.7,
-          experimental_telemetry: {
-            isEnabled: true,
-            functionId: "groq-text-generation",
-            recordInputs: true,
-            recordOutputs: true,
-          },
+          experimental_telemetry: createTelemetryConfig("groq-text-generation"),
         });
 
         // Return the generated response

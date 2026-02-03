@@ -3,6 +3,7 @@ import { generateText } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 import { firecrawl } from "@/lib/firecrawl";
 import { extractUrl, shouldUseWebSearch } from "@/lib/web-search";
+import { createTelemetryConfig } from "@/lib/telemetry-config";
 import * as Sentry from "@sentry/nextjs";
 
 export async function POST(request: NextRequest) {
@@ -69,12 +70,9 @@ export async function POST(request: NextRequest) {
             model: google("gemini-2.5-flash"),
             prompt: analysisPrompt,
             temperature: 0.7,
-            experimental_telemetry: {
-              isEnabled: true,
-              functionId: "gemini-web-search-analysis",
-              recordInputs: true,
-              recordOutputs: true,
-            },
+            experimental_telemetry: createTelemetryConfig(
+              "gemini-web-search-analysis",
+            ),
           });
 
           return NextResponse.json({
@@ -96,12 +94,9 @@ export async function POST(request: NextRequest) {
           model: google("gemini-2.5-flash"),
           prompt: prompt,
           temperature: 0.7,
-          experimental_telemetry: {
-            isEnabled: true,
-            functionId: "gemini-direct-generation",
-            recordInputs: true,
-            recordOutputs: true,
-          },
+          experimental_telemetry: createTelemetryConfig(
+            "gemini-direct-generation",
+          ),
         });
 
         // Return the generated response

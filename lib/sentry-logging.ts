@@ -34,31 +34,12 @@ export function captureLog(
   message: string,
   context?: LogContext,
 ) {
-  const scope = new Sentry.Scope();
-
-  // Add tags for filtering in Sentry
-  if (context?.tags) {
-    Object.entries(context.tags).forEach(([key, value]) => {
-      scope.setTag(key, value);
-    });
-  }
-
-  // Add extra context data
-  if (context?.extra) {
-    Object.entries(context.extra).forEach(([key, value]) => {
-      scope.setExtra(key, value);
-    });
-  }
-
-  // Add user context if provided
-  if (context?.user) {
-    scope.setUser(context.user);
-  }
-
-  // Capture the message with appropriate level
+  // Capture the message with proper context object
   Sentry.captureMessage(message, {
     level,
-    captureContext: scope,
+    tags: context?.tags,
+    extra: context?.extra,
+    user: context?.user,
   });
 }
 

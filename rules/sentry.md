@@ -5,11 +5,11 @@ These examples should be used as guidance when configuring Sentry functionality 
 ## Exception Catching
 
 Use `Sentry.captureException(error)` to capture an exception and log the error in Sentry.
-Use this in try catch blocks or areas where exceptions are expected
+Use this in try-catch blocks or areas where exceptions are expected.
 
 ## Tracing Examples
 
-Spans should be created for meaningful actions within an applications like button clicks, API calls, and function calls.
+Spans should be created for meaningful actions within an application like button clicks, API calls, and function calls.
 Use the `Sentry.startSpan` function to create a span.
 Child spans can exist within a parent span.
 

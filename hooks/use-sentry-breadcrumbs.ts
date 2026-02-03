@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
   trackUserAction,
@@ -19,12 +19,14 @@ import {
 
 export function useSentryBreadcrumbs() {
   const pathname = usePathname();
+  const prevPathRef = useRef<string | null>(null);
 
   // Track navigation changes
   useEffect(() => {
-    if (pathname) {
-      trackNavigation(window.location.pathname, pathname);
+    if (prevPathRef.current && pathname) {
+      trackNavigation(prevPathRef.current, pathname);
     }
+    prevPathRef.current = pathname ?? null;
   }, [pathname]);
 
   // Return helper functions for manual tracking

@@ -32,13 +32,19 @@ Sentry has been successfully set up for your Next.js application with the follow
 
 ### 🔑 Important Environment Variables
 
-The following has been added to your CI/CD configuration:
+The following has been added to your `.env` file:
 
 ```bash
-SENTRY_AUTH_TOKEN=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
+SENTRY_AUTH_TOKEN=[YOUR_TOKEN_HERE]
 ```
 
-⚠️ **IMPORTANT**: Do NOT commit this token to your repository! It's already added to `.gitignore`.
+⚠️ **SECURITY WARNING**:
+
+- This token grants access to your Sentry organization
+- **NEVER** commit this token to your repository or share it publicly
+- The token is already in `.gitignore` to prevent accidental commits
+- If exposed, immediately revoke it at: https://sentry.io/settings/account/api/auth-tokens/
+- For CI/CD, use secure environment variable storage (GitHub Secrets, Vercel, etc.)
 
 ### 🔧 Configuration Details
 

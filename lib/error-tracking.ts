@@ -159,7 +159,17 @@ export function trackValidationError(
       },
       extra: {
         field,
-        value: typeof value === "object" ? JSON.stringify(value) : value,
+        value: (() => {
+          if (typeof value !== "object" || value === null) {
+            return value;
+          }
+
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return "[unserializable object]";
+          }
+        })(),
         expected_type: context.expectedType,
       },
     },

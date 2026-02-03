@@ -9,6 +9,7 @@ import {
   trackPerformance,
   trackValidationError,
 } from "@/lib/error-tracking";
+import { createTelemetryConfig } from "@/lib/telemetry-config";
 
 type AIProvider = "gemini" | "groq";
 
@@ -114,12 +115,9 @@ export async function POST(request: NextRequest) {
             model: groq("llama-3.3-70b-versatile"),
             prompt: prompt,
             temperature: 0.7,
-            experimental_telemetry: {
-              isEnabled: true,
-              functionId: "groq-scrape-analysis",
-              recordInputs: true,
-              recordOutputs: true,
-            },
+            experimental_telemetry: createTelemetryConfig(
+              "groq-scrape-analysis",
+            ),
           });
           aiResult = {
             analysis: text,
@@ -133,12 +131,9 @@ export async function POST(request: NextRequest) {
             model: google("gemini-2.5-flash"),
             prompt: prompt,
             temperature: 0.7,
-            experimental_telemetry: {
-              isEnabled: true,
-              functionId: "gemini-scrape-analysis",
-              recordInputs: true,
-              recordOutputs: true,
-            },
+            experimental_telemetry: createTelemetryConfig(
+              "gemini-scrape-analysis",
+            ),
           });
           aiResult = {
             analysis: text,
