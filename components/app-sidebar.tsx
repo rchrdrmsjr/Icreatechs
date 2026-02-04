@@ -14,12 +14,18 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
+  User,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "next-themes";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const links = [
     { href: "/app", label: "Dashboard", icon: LayoutDashboard },
@@ -29,7 +35,8 @@ export function AppSidebar() {
     { href: "/app/usage", label: "Usage", icon: BarChart3 },
     { href: "/app/billing", label: "Billing", icon: CreditCard },
     { href: "/app/team", label: "Team", icon: Users },
-    { href: "/app/account", label: "Account", icon: Settings },
+    { href: "/app/settings", label: "Settings", icon: Settings },
+    { href: "/app/account", label: "Account", icon: User },
   ];
 
   return (
@@ -78,6 +85,24 @@ export function AppSidebar() {
           );
         })}
       </nav>
+      <div className="border-t border-border p-4">
+        <button
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors text-muted-foreground hover:bg-accent hover:text-foreground ${
+            isCollapsed ? "justify-center" : ""
+          }`}
+          title={
+            isCollapsed ? (isDark ? "Light mode" : "Dark mode") : undefined
+          }
+        >
+          {isDark ? (
+            <Moon className="h-4 w-4 shrink-0" />
+          ) : (
+            <Sun className="h-4 w-4 shrink-0" />
+          )}
+          {!isCollapsed && <span>{isDark ? "Dark mode" : "Light mode"}</span>}
+        </button>
+      </div>
       <div className="border-t border-border p-4">
         <UserProfile isCollapsed={isCollapsed} />
       </div>

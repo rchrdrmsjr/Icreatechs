@@ -14,6 +14,39 @@ export default async function DashboardPage() {
     { id: "3", name: "Blog Platform", updated: "3 days ago" },
   ];
 
+  const lastUpdated = [
+    {
+      id: "1",
+      project: "Portfolio Website",
+      action: "Deployed to production",
+      time: "2 hours ago",
+    },
+    {
+      id: "2",
+      project: "E-commerce App",
+      action: "Updated dependencies",
+      time: "5 hours ago",
+    },
+    {
+      id: "3",
+      project: "Blog Platform",
+      action: "Added new blog post",
+      time: "1 day ago",
+    },
+    {
+      id: "4",
+      project: "Mobile App",
+      action: "Fixed navigation bug",
+      time: "2 days ago",
+    },
+    {
+      id: "5",
+      project: "API Service",
+      action: "Optimized database queries",
+      time: "3 days ago",
+    },
+  ];
+
   return (
     <div className="space-y-8 p-8">
       <div>
@@ -62,6 +95,37 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </Link>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold">Last Updated</h2>
+          <p className="text-sm text-muted-foreground">
+            Recent activity across your projects
+          </p>
+        </div>
+        <div className="rounded-lg border border-border">
+          {lastUpdated.map((update, index) => (
+            <div
+              key={update.id}
+              className={`p-4 ${
+                index !== lastUpdated.length - 1 ? "border-b border-border" : ""
+              } hover:bg-accent`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <div className="font-medium">{update.project}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {update.action}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+                  {update.time}
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
