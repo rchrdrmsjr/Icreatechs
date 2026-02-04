@@ -3,6 +3,11 @@ import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 import { firecrawl } from "@/lib/firecrawl";
+import {
+  trackInngestError,
+  trackExternalServiceError,
+} from "@/lib/error-tracking";
+import { createTelemetryConfig } from "@/lib/telemetry-config";
 
 export const helloWorld = inngest.createFunction(
   { id: "hello-world" },
@@ -31,6 +36,9 @@ export const generateAIText = inngest.createFunction(
         model: google("gemini-2.5-flash"),
         prompt: prompt,
         temperature: 0.7,
+        experimental_telemetry: createTelemetryConfig(
+          "inngest-gemini-background",
+        ),
       });
 
       return {
@@ -73,6 +81,9 @@ export const generateGroqText = inngest.createFunction(
         model: groq("llama-3.3-70b-versatile"),
         prompt: prompt,
         temperature: 0.7,
+        experimental_telemetry: createTelemetryConfig(
+          "inngest-groq-background",
+        ),
       });
 
       return {
@@ -232,6 +243,9 @@ export const scrapeAndAnalyze = inngest.createFunction(
           model: groq("llama-3.3-70b-versatile"),
           prompt: prompt,
           temperature: 0.7,
+          experimental_telemetry: createTelemetryConfig(
+            "inngest-groq-scrape-analysis",
+          ),
         });
         text = result.text;
         usage = result.usage;
@@ -245,6 +259,9 @@ export const scrapeAndAnalyze = inngest.createFunction(
           model: google("gemini-2.5-flash"),
           prompt: prompt,
           temperature: 0.7,
+          experimental_telemetry: createTelemetryConfig(
+            "inngest-gemini-scrape-analysis",
+          ),
         });
         text = result.text;
         usage = result.usage;
