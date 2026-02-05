@@ -139,6 +139,7 @@ export default function ProjectDetailPage() {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
             title="Run Code"
           >
@@ -146,6 +147,7 @@ export default function ProjectDetailPage() {
             <span className="hidden sm:inline">Run</span>
           </button>
           <button
+            type="button"
             className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
             title="Deploy Project"
           >
@@ -153,6 +155,7 @@ export default function ProjectDetailPage() {
             <span className="hidden sm:inline">Deploy</span>
           </button>
           <button
+            type="button"
             className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
             title="Share Project"
           >
@@ -160,6 +163,7 @@ export default function ProjectDetailPage() {
             <span className="hidden sm:inline">Share</span>
           </button>
           <button
+            type="button"
             className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
             title="Project Settings"
           >
@@ -255,6 +259,7 @@ export default function ProjectDetailPage() {
             {/* Code/Preview Tab Switcher */}
             <div className="flex items-center border-b border-border">
               <button
+                type="button"
                 onClick={() => setViewMode("code")}
                 className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
                   viewMode === "code"
@@ -266,6 +271,7 @@ export default function ProjectDetailPage() {
                 Terminal
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("preview")}
                 className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
                   viewMode === "preview"

@@ -92,12 +92,6 @@ export default function SettingsPage() {
     // router.back();
   };
 
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    updates: true,
-  });
-
   return (
     <div className="space-y-8 p-8">
       <div>

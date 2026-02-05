@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const supabase = createClient(cookies());
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
   const {
     data: { user },
   } = await supabase.auth.getUser();
