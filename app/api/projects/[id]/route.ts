@@ -29,7 +29,7 @@ export async function GET(
     async () => {
       try {
         const { id } = await params;
-        const cookieStore = await cookies();
+        const cookieStore = cookies();
         const supabase = createClient(cookieStore);
 
         // Get authenticated user
@@ -106,7 +106,7 @@ export async function PATCH(
     async () => {
       try {
         const { id } = await params;
-        const cookieStore = await cookies();
+        const cookieStore = cookies();
         const supabase = createClient(cookieStore);
 
         // Get authenticated user
@@ -242,7 +242,7 @@ export async function DELETE(
     async () => {
       try {
         const { id } = await params;
-        const cookieStore = await cookies();
+        const cookieStore = cookies();
         const supabase = createClient(cookieStore);
 
         // Get authenticated user

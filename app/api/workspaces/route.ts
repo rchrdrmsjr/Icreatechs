@@ -14,7 +14,7 @@ export async function GET() {
     },
     async () => {
       try {
-        const cookieStore = await cookies();
+        const cookieStore = cookies();
         const supabase = createClient(cookieStore);
 
         // Get authenticated user
