@@ -15,7 +15,8 @@ export async function GET() {
     },
     async () => {
       try {
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {
@@ -109,7 +110,8 @@ export async function POST(request: NextRequest) {
     },
     async () => {
       try {
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {
@@ -155,10 +157,18 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate slug from name
-        const slug = name
+        let slug = name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
+
+        // Validate slug is not empty (can happen with special chars only)
+        if (slug === "") {
+          // Generate fallback slug using timestamp and random suffix
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          slug = `project-${timestamp}-${randomSuffix}`;
+        }
 
         // Create project
         const { data: project, error: createError } = await supabase

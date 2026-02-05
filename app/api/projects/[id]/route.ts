@@ -29,7 +29,8 @@ export async function GET(
     async () => {
       try {
         const { id } = await params;
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {
@@ -105,7 +106,8 @@ export async function PATCH(
     async () => {
       try {
         const { id } = await params;
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {
@@ -168,7 +170,7 @@ export async function PATCH(
           );
         }
 
-        // Update project           
+        // Update project
         const { data: updatedProject, error: updateError } = await supabase
           .from("projects")
           .update(updates)
@@ -240,7 +242,8 @@ export async function DELETE(
     async () => {
       try {
         const { id } = await params;
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {

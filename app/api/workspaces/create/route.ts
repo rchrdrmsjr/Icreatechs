@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
     },
     async () => {
       try {
-        const supabase = createClient(cookies());
+        const cookieStore = await cookies();
+        const supabase = createClient(cookieStore);
 
         // Get authenticated user
         const {
