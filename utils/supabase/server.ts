@@ -4,17 +4,24 @@ import { cookies } from "next/headers";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
-export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+type CookieStoreInput = CookieStore | Promise<CookieStore>;
+
+export const createClient = (cookieStore: CookieStoreInput) => {
+  const cookieStorePromise = Promise.resolve(cookieStore);
+
   return createServerClient(supabaseUrl!, supabaseKey!, {
     cookies: {
       async getAll() {
-        return (await cookieStore).getAll();
+        return (await cookieStorePromise).getAll();
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(async ({ name, value, options }) =>
-            (await cookieStore).set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            void cookieStorePromise.then((store) =>
+              store.set(name, value, options),
+            );
+          });
         } catch {
           // The `setAll` method was called from a Server Component.
           // This can be ignored if you have middleware refreshing
