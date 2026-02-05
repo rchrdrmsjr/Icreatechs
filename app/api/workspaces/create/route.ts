@@ -38,10 +38,18 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate slug from name
-        const slug = name
+        let slug = name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
+
+        // Validate slug is not empty (can happen with special chars only)
+        if (slug === "") {
+          // Generate fallback slug using timestamp and random suffix
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          slug = `workspace-${timestamp}-${randomSuffix}`;
+        }
 
         // Use database function to create workspace and member atomically
         // This bypasses RLS recursion issues

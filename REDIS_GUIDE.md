@@ -102,7 +102,7 @@ export async function checkRateLimit(userId: string): Promise<boolean> {
 
   if (count === 1) {
     // Set expiration on first request
-    await cache.set(key, count, 60); // 60 seconds window
+    await cache.set(key, count, 60); // 60-second window
   }
 
   return count <= 100; // Max 100 requests per minute

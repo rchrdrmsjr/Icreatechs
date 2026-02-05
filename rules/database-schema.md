@@ -159,8 +159,8 @@ CREATE TABLE public.oauth_connections (
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   provider TEXT NOT NULL CHECK (provider IN ('github', 'google', 'gitlab', 'bitbucket')),
   provider_user_id TEXT NOT NULL,
-  access_token TEXT,
-  refresh_token TEXT,
+  access_token_encrypted BYTEA,
+  refresh_token_encrypted BYTEA,
   token_expires_at TIMESTAMPTZ,
   scopes TEXT[],
   metadata JSONB DEFAULT '{}',
@@ -171,6 +171,11 @@ CREATE TABLE public.oauth_connections (
 
 CREATE INDEX idx_oauth_connections_user ON public.oauth_connections(user_id);
 CREATE INDEX idx_oauth_connections_provider ON public.oauth_connections(provider);
+
+-- Encryption requirements (pgcrypto)
+-- CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Store tokens with: pgp_sym_encrypt(token, current_setting('app.encryption_key'))
+-- Read tokens with:  pgp_sym_decrypt(access_token_encrypted, current_setting('app.encryption_key'))
 ```
 
 ### `user_sessions_extended`
@@ -228,7 +233,7 @@ CREATE INDEX idx_subscription_plans_active ON public.subscription_plans(is_activ
 
 Stripe customer mapping
 
-```sql
+```sql  
 CREATE TABLE public.customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
@@ -898,7 +903,7 @@ CREATE INDEX idx_analytics_events_properties ON public.analytics_events USING GI
 
 ## 📝 Notes
 
-1. **Encryption**: Fields marked `*_encrypted` should use `pgcrypto` extension
+1. **Encryption**: Fields marked `*_encrypted` must use `pgcrypto` (enable with `CREATE EXTENSION IF NOT EXISTS pgcrypto;`) and be written/read via `pgp_sym_encrypt`/`pgp_sym_decrypt` using a managed key (e.g., `current_setting('app.encryption_key')`)
 2. **Storage**: Large files should use Supabase Storage with references in `files.storage_path`
 3. **Partitioning**: Consider partitioning `analytics_events`, `api_logs`, `usage_records` by date for performance
 4. **Retention**: Set up automated cleanup jobs for old logs and analytics (90-day retention)

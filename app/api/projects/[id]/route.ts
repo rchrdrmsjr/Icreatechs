@@ -6,6 +6,16 @@ import { cache } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
+// Type for project updates in PATCH requests
+type ProjectUpdate = Partial<{
+  name: string;
+  slug: string;
+  description: string;
+  language: string;
+  framework: string;
+  visibility: "public" | "private" | "team";
+}>;
+
 // GET /api/projects/[id] - Get single project and update last_accessed_at
 export async function GET(
   request: NextRequest,
@@ -137,7 +147,7 @@ export async function PATCH(
         }
 
         // Build update object
-        const updates: any = {};
+        const updates: ProjectUpdate = {};
         if (name !== undefined) {
           updates.name = name;
           updates.slug = name
@@ -150,7 +160,15 @@ export async function PATCH(
         if (framework !== undefined) updates.framework = framework;
         if (visibility !== undefined) updates.visibility = visibility;
 
-        // Update project
+        // Reject if no updatable fields provided
+        if (Object.keys(updates).length === 0) {
+          return NextResponse.json(
+            { error: "No updatable fields provided" },
+            { status: 400 },
+          );
+        }
+
+        // Update project           
         const { data: updatedProject, error: updateError } = await supabase
           .from("projects")
           .update(updates)
@@ -171,10 +189,31 @@ export async function PATCH(
           userId: user.id,
         });
 
-        // Invalidate user's projects cache
+        // Invalidate user's projects cache (best-effort)
         const cacheKey = `projects:user:${user.id}`;
-        await cache.del(cacheKey);
-        Sentry.logger.info("Projects cache invalidated", { userId: user.id });
+        try {
+          await cache.del(cacheKey);
+          Sentry.logger.info("Projects cache invalidated", {
+            userId: user.id,
+            cacheKey,
+          });
+        } catch (cacheError) {
+          Sentry.captureException(cacheError, {
+            data: {
+              userId: user.id,
+              cacheKey,
+              operation: "invalidate_user_projects_cache",
+            },
+          });
+          Sentry.logger.error("Failed to invalidate projects cache", {
+            userId: user.id,
+            cacheKey,
+            error:
+              cacheError instanceof Error
+                ? cacheError.message
+                : String(cacheError),
+          });
+        }
 
         return NextResponse.json({ project: updatedProject });
       } catch (error) {
@@ -268,10 +307,31 @@ export async function DELETE(
           userId: user.id,
         });
 
-        // Invalidate user's projects cache
+        // Invalidate user's projects cache (best-effort)
         const cacheKey = `projects:user:${user.id}`;
-        await cache.del(cacheKey);
-        Sentry.logger.info("Projects cache invalidated", { userId: user.id });
+        try {
+          await cache.del(cacheKey);
+          Sentry.logger.info("Projects cache invalidated", {
+            userId: user.id,
+            cacheKey,
+          });
+        } catch (cacheError) {
+          Sentry.captureException(cacheError, {
+            data: {
+              userId: user.id,
+              cacheKey,
+              operation: "invalidate_user_projects_cache",
+            },
+          });
+          Sentry.logger.error("Failed to invalidate projects cache", {
+            userId: user.id,
+            cacheKey,
+            error:
+              cacheError instanceof Error
+                ? cacheError.message
+                : String(cacheError),
+          });
+        }
 
         return NextResponse.json({ success: true });
       } catch (error) {

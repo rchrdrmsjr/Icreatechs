@@ -37,10 +37,22 @@ export async function GET() {
         }
 
         // First, get workspaces user is a member of
-        const { data: workspaceMemberships } = await supabase
-          .from("workspace_members")
-          .select("workspace_id")
-          .eq("user_id", user.id);
+        const { data: workspaceMemberships, error: workspaceError } =
+          await supabase
+            .from("workspace_members")
+            .select("workspace_id")
+            .eq("user_id", user.id);
+
+        if (workspaceError) {
+          Sentry.captureException(workspaceError);
+          return NextResponse.json(
+            {
+              error: "Failed to fetch workspace memberships",
+              details: workspaceError.message,
+            },
+            { status: 500 },
+          );
+        }
 
         // If user has no workspace memberships, return empty array
         if (!workspaceMemberships || workspaceMemberships.length === 0) {

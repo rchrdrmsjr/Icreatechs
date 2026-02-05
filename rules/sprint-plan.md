@@ -52,131 +52,157 @@ Here's the optimal build sequence for fast MVP delivery with working features at
 
 ---
 
-## SPRINT 3: Code Execution (Week 3)
+## SPRINT 3: Execution Foundations (Week 3)
 
-**Goal: Users can run their code**
+**Goal: Prepare for secure code execution**
 
 ### 6. IDE / Editor - Terminal (Days 1-3)
 
 - Terminal UI component
 - Command execution interface
 
-### 7. Infrastructure - Execution (Days 4-7)
+### 7. Execution Architecture (Days 4-7)
 
-- Execution Engine (Judge0/Docker setup)
-- API Routes (execute code endpoints)
-- Error handling for execution
+- Execution Engine design (Judge0/Docker architecture)
+- Non-production execution prototype (no public access)
+- API route skeletons (execute endpoints, validation stubs)
+- Error handling scaffolding (structured errors, logging hooks)
 
-✅ **Sprint 3 Deliverable:** Full IDE with code execution
+✅ **Sprint 3 Deliverable:** Execution UI + architecture in place (not yet production-safe)
 
 ---
 
-## SPRINT 4: AI Power (Week 4)
+## SPRINT 4: Security & Hardening (Week 4)
+
+**Goal: Secure, production-ready code execution**
+
+### 8. Security & Isolation (Days 1-4)
+
+- Sandboxing design finalized
+- Docker/Judge0 isolation configuration
+- Resource limits (CPU/memory), timeout enforcement
+- Input/output size limits
+- Malicious syscall prevention (seccomp/AppArmor)
+- Secrets isolation (no env leakage)
+
+### 9. Validation & Rollout (Days 5-7)
+
+- Integration tests for execution pipeline
+- Fuzz testing on inputs/outputs
+- Abuse/DoS testing and rate limits
+- Staged rollout plan + monitoring dashboards
+- **Acceptance criteria:** all security tests pass, limits enforced, telemetry in place
+
+✅ **Sprint 4 Deliverable:** Full IDE with secure code execution (production-safe)
+
+---
+
+## SPRINT 5: AI Power (Week 5)
 
 **Goal: AI-assisted coding**
 
-### 8. AI & Agents (Days 1-5)
+### 10. AI & Agents (Days 1-5)
 
 - Chat/Completions (basic chat UI)
 - LLM Orchestration (OpenAI/Anthropic integration)
 - Code Analysis (explain code)
 - Agent Tools (basic file operations)
 
-### 9. Core Platform - Conversations (Days 6-7)
+### 11. Core Platform - Conversations (Days 6-7)
 
 - Conversations (chat threads per project)
 - Message history
 
-✅ **Sprint 4 Deliverable:** AI chat assistant for coding help
+✅ **Sprint 5 Deliverable:** AI chat assistant for coding help
 
 ---
 
-## SPRINT 5: Advanced AI (Week 5)
+## SPRINT 6: Advanced AI (Week 6)
 
 **Goal: Powerful AI features**
 
-### 10. AI & Agents - Advanced (Days 1-4)
+### 12. AI & Agents - Advanced (Days 1-4)
 
 - Refactoring
 - Code generation
 - Background Jobs (Inngest setup for async AI)
 
-### 11. Infrastructure - Jobs (Days 5-7)
+### 13. Infrastructure - Jobs (Days 5-7)
 
 - Background Jobs (Inngest workflows)
 - Job queue management
 
-✅ **Sprint 5 Deliverable:** AI can refactor and generate code
+✅ **Sprint 6 Deliverable:** AI can refactor and generate code
 
 ---
 
-## SPRINT 6: Monetization (Week 6)
+## SPRINT 7: Monetization (Week 7)
 
 **Goal: Start making money**
 
-### 12. Billing (Days 1-5)
+### 14. Billing (Days 1-5)
 
 - Stripe Integration
 - Subscription Plans
 - Payment Methods
 - Billing UI (upgrade flows)
 
-### 13. Billing - Metering (Days 6-7)
+### 15. Billing - Metering (Days 6-7)
 
 - Usage Metering (track AI tokens)
 - Usage dashboards
 
-✅ **Sprint 6 Deliverable:** Users can subscribe and pay
+✅ **Sprint 7 Deliverable:** Users can subscribe and pay
 
 ---
 
-## SPRINT 7: GitHub & Collaboration (Week 7)
+## SPRINT 8: GitHub & Collaboration (Week 8)
 
 **Goal: Import/export and version control**
 
-### 14. External APIs - GitHub (Days 1-4)
+### 16. External APIs - GitHub (Days 1-4)
 
 - GitHub Integration (OAuth)
 - Repo import/export
 
-### 15. Infrastructure - Version Control (Days 5-7)
+### 17. Infrastructure - Version Control (Days 5-7)
 
 - Version Control (GitHub API integration)
 - Import/export flows
 
-✅ **Sprint 7 Deliverable:** Import GitHub repos, export projects
+✅ **Sprint 8 Deliverable:** Import GitHub repos, export projects
 
 ---
 
-## SPRINT 8: Production Ready (Week 8)
+## SPRINT 9: Production Ready (Week 9)
 
 **Goal: Launch-ready product**
 
-### 16. Observability (Days 1-3)
+### 18. Observability (Days 1-3)
 
 - Error Tracking (Sentry)
 - Logging
 - Monitoring
 
-### 17. Deployment (Days 4-6)
+### 19. Deployment (Days 4-6)
 
 - CI/CD (GitHub Actions)
 - Production Infrastructure (Vercel)
 - Database Deployment
 - DNS/Domain
 
-### 18. Core Platform - Polish (Day 7)
+### 20. Core Platform - Polish (Day 7)
 
 - Landing/Marketing page
 - Final UI polish
 
-✅ **Sprint 8 Deliverable:** Production launch! 🎉
+✅ **Sprint 9 Deliverable:** Production launch! 🎉
 
 ---
 
 ## POST-LAUNCH: Enhancements
 
-**Sprint 9+**
+**Sprint 10+**
 
 - IDE advanced features (Git integration, extensions)
 - AI web scraping (Firecrawl)
@@ -201,13 +227,15 @@ Here's the optimal build sequence for fast MVP delivery with working features at
 ```
 Sprint 1 (Foundation)
     ↓
-Sprint 2 (Editor) → Sprint 3 (Execution)
+Sprint 2 (Editor) → Sprint 3 (Execution Foundations)
     ↓                      ↓
-Sprint 4 (AI Basic) → Sprint 5 (AI Advanced)
+Sprint 4 (Security & Hardening) → Sprint 5 (AI Basic)
     ↓                      ↓
-Sprint 6 (Billing) ← Sprint 7 (GitHub)
+Sprint 6 (AI Advanced)
+    ↓                      ↓
+Sprint 7 (Billing) ← Sprint 8 (GitHub)
     ↓
-Sprint 8 (Launch)
+Sprint 9 (Launch)
 ```
 
 ---

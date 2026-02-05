@@ -1,11 +1,97 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Moon, Sun, Monitor, Bell, Globe, Lock, Palette } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
+
+interface SettingsState {
+  notifications: {
+    email: boolean;
+    push: boolean;
+    updates: boolean;
+  };
+  language: string;
+  timezone: string;
+  privacy: {
+    analytics: boolean;
+    errorReporting: boolean;
+  };
+}
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+
+  // Initialize settings from localStorage
+  const [settings, setSettings] = useState<SettingsState>({
+    notifications: {
+      email: true,
+      push: false,
+      updates: true,
+    },
+    language: "English",
+    timezone: "UTC-8 (Pacific Time)",
+    privacy: {
+      analytics: true,
+      errorReporting: true,
+    },
+  });
+
+  const [initialSettings, setInitialSettings] = useState<SettingsState | null>(
+    null,
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("userSettings");
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(parsed);
+        setInitialSettings(parsed);
+      } catch (error) {
+        console.error("Failed to parse saved settings:", error);
+      }
+    } else {
+      setInitialSettings(settings);
+    }
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Persist to localStorage
+      localStorage.setItem("userSettings", JSON.stringify(settings));
+      setInitialSettings(settings);
+
+      // TODO: Add API call to persist settings to database
+      // await fetch('/api/settings', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(settings),
+      // });
+
+      // Show success feedback (you can add a toast here)
+      console.log("Settings saved successfully");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      // Show error feedback (you can add a toast here)
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (initialSettings) {
+      // Revert to initial settings
+      setSettings(initialSettings);
+    }
+    // Optionally navigate away
+    // router.back();
+  };
+
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -86,15 +172,23 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() =>
-                  setNotifications((prev) => ({ ...prev, email: !prev.email }))
+                  setSettings((prev) => ({
+                    ...prev,
+                    notifications: {
+                      ...prev.notifications,
+                      email: !prev.notifications.email,
+                    },
+                  }))
                 }
                 className={`relative h-6 w-11 rounded-full transition-colors ${
-                  notifications.email ? "bg-foreground" : "bg-border"
+                  settings.notifications.email ? "bg-foreground" : "bg-border"
                 }`}
               >
                 <div
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
-                    notifications.email ? "translate-x-5" : "translate-x-0.5"
+                    settings.notifications.email
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
                   }`}
                 />
               </button>
@@ -108,15 +202,23 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() =>
-                  setNotifications((prev) => ({ ...prev, push: !prev.push }))
+                  setSettings((prev) => ({
+                    ...prev,
+                    notifications: {
+                      ...prev.notifications,
+                      push: !prev.notifications.push,
+                    },
+                  }))
                 }
                 className={`relative h-6 w-11 rounded-full transition-colors ${
-                  notifications.push ? "bg-foreground" : "bg-border"
+                  settings.notifications.push ? "bg-foreground" : "bg-border"
                 }`}
               >
                 <div
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
-                    notifications.push ? "translate-x-5" : "translate-x-0.5"
+                    settings.notifications.push
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
                   }`}
                 />
               </button>
@@ -130,18 +232,23 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() =>
-                  setNotifications((prev) => ({
+                  setSettings((prev) => ({
                     ...prev,
-                    updates: !prev.updates,
+                    notifications: {
+                      ...prev.notifications,
+                      updates: !prev.notifications.updates,
+                    },
                   }))
                 }
                 className={`relative h-6 w-11 rounded-full transition-colors ${
-                  notifications.updates ? "bg-foreground" : "bg-border"
+                  settings.notifications.updates ? "bg-foreground" : "bg-border"
                 }`}
               >
                 <div
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
-                    notifications.updates ? "translate-x-5" : "translate-x-0.5"
+                    settings.notifications.updates
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
                   }`}
                 />
               </button>
@@ -158,7 +265,13 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-medium">Language</label>
-              <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <select
+                value={settings.language}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, language: e.target.value }))
+                }
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
                 <option>English</option>
                 <option>Spanish</option>
                 <option>French</option>
@@ -170,7 +283,13 @@ export default function SettingsPage() {
               <label className="mb-2 block text-sm font-medium">
                 Time Zone
               </label>
-              <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <select
+                value={settings.timezone}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, timezone: e.target.value }))
+                }
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
                 <option>UTC-8 (Pacific Time)</option>
                 <option>UTC-5 (Eastern Time)</option>
                 <option>UTC+0 (London)</option>
@@ -195,8 +314,27 @@ export default function SettingsPage() {
                   Help us improve by sharing anonymous usage data
                 </div>
               </div>
-              <button className="relative h-6 w-11 rounded-full bg-foreground transition-colors">
-                <div className="absolute top-0.5 h-5 w-5 translate-x-5 rounded-full bg-background transition-transform" />
+              <button
+                onClick={() =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    privacy: {
+                      ...prev.privacy,
+                      analytics: !prev.privacy.analytics,
+                    },
+                  }))
+                }
+                className={`relative h-6 w-11 rounded-full transition-colors ${
+                  settings.privacy.analytics ? "bg-foreground" : "bg-border"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
+                    settings.privacy.analytics
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
+                  }`}
+                />
               </button>
             </div>
             <div className="flex items-center justify-between">
@@ -206,8 +344,29 @@ export default function SettingsPage() {
                   Automatically send error reports to help us fix bugs
                 </div>
               </div>
-              <button className="relative h-6 w-11 rounded-full bg-foreground transition-colors">
-                <div className="absolute top-0.5 h-5 w-5 translate-x-5 rounded-full bg-background transition-transform" />
+              <button
+                onClick={() =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    privacy: {
+                      ...prev.privacy,
+                      errorReporting: !prev.privacy.errorReporting,
+                    },
+                  }))
+                }
+                className={`relative h-6 w-11 rounded-full transition-colors ${
+                  settings.privacy.errorReporting
+                    ? "bg-foreground"
+                    : "bg-border"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
+                    settings.privacy.errorReporting
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -215,11 +374,18 @@ export default function SettingsPage() {
 
         {/* Save Button */}
         <div className="flex justify-end gap-3">
-          <button className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent">
+          <button
+            onClick={handleCancel}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
             Cancel
           </button>
-          <button className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90">
-            Save Changes
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>

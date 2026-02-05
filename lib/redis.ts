@@ -44,7 +44,16 @@ export class RedisCache {
   // Get cached value
   async get<T>(key: string): Promise<T | null> {
     const data = await this.client.get(key);
-    return data ? JSON.parse(data) : null;
+    if (!data) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(data) as T;
+    } catch (error) {
+      console.warn("Failed to parse Redis get value", { error, key });
+      return null;
+    }
   }
 
   // Delete key
@@ -71,7 +80,21 @@ export class RedisCache {
   // Get multiple keys
   async mget<T>(keys: string[]): Promise<(T | null)[]> {
     const values = await this.client.mget(...keys);
-    return values.map((val) => (val ? JSON.parse(val) : null));
+    return values.map((val) => {
+      if (!val) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(val) as T;
+      } catch (error) {
+        console.warn("Failed to parse Redis mget value", {
+          error,
+          value: val,
+        });
+        return null;
+      }
+    });
   }
 
   // Set multiple keys
