@@ -58,14 +58,105 @@ Create a Notion database with these fields:
 - IDE / Editor
 - Infrastructure
 - Observability
-- Integrations
+- External APIs
 - Deployment
+
+---
+
+## 📦 SUB-MODULES (Detailed breakdown for each module)
+
+### Core Platform
+
+- **Landing/Marketing** - Home page, pricing page, docs landing
+- **Projects Management** - Create, open, delete projects/workspaces
+- **Conversations** - Chat threads, message history per project
+- **User Dashboard** - Overview, recent activity, stats
+- **Workspaces** - Workspace state, settings, collaboration
+- **Navigation** - Sidebar, navbar, routing
+
+### Authentication
+
+- **Sign Up/Sign In** - Registration, login flows, email verification
+- **JWT/Sessions** - Token management, session handling
+- **OAuth/SSO** - Third-party auth (Google, GitHub, etc.)
+- **User Sync** - Supabase → Postgres user data sync
+- **Password Management** - Reset, change, forgot password
+- **Profile** - User profile, preferences, account settings
+
+### Billing
+
+- **Stripe Integration** - Customer creation, webhook handlers
+- **Subscription Plans** - Plan definitions, tier management
+- **Usage Metering** - Track AI tokens, API calls, storage
+- **Invoicing** - Invoice generation, payment history
+- **Payment Methods** - Card management, payment processing
+- **Billing UI** - Upgrade flows, usage dashboards
+
+### AI & Agents
+
+- **Chat/Completions** - AI chat interface, streaming responses
+- **Code Analysis** - Explain code, generate docs
+- **Refactoring** - Code transformation, optimization
+- **Web Scraping** - Firecrawl integration, data extraction
+- **Background Jobs** - Async AI processing via Inngest
+- **Agent Tools** - File operations, command execution
+- **LLM Orchestration** - Model selection, prompt engineering
+
+### IDE / Editor
+
+- **Layout/UI** - Panels, tabs, resizing, split views
+- **File Explorer** - Tree view, file operations, search
+- **Monaco Editor** - Code editing, syntax highlighting
+- **Terminal** - Web terminal, command execution
+- **Code State** - Open files, cursor position, undo/redo
+- **Extensions** - Language support, themes
+- **Git Integration** - Diff view, commit, branch management
+
+### Infrastructure
+
+- **Database Schema** - Table definitions, migrations, RLS
+- **Background Jobs** - Inngest workflows, job queue
+- **Execution Engine** - Judge0/Docker code execution
+- **API Routes** - Next.js API handlers, middleware
+- **Version Control** - GitHub API, import/export
+- **File Storage** - Supabase storage, file uploads
+- **Cache/Redis** - Caching layer, session storage
+
+### Observability
+
+- **Error Tracking** - Sentry integration, error boundaries
+- **Logging** - Structured logs, log aggregation
+- **Monitoring** - Performance metrics, uptime
+- **Analytics** - User analytics, feature usage
+- **Alerting** - Error notifications, threshold alerts
+- **Debugging** - Source maps, stack traces
+
+### External APIs
+
+- **GitHub Integration** - Repo import/export, OAuth
+- **Firecrawl** - Web scraping API
+- **LLM Providers** - OpenAI, Anthropic, Google AI
+- **Stripe** - Payment processing
+- **Supabase** - Auth, database, storage APIs
+- **Inngest** - Background job orchestration
+- **Third-party Tools** - Other integrations
+
+### Deployment
+
+- **CI/CD** - GitHub Actions, automated deployments
+- **Environment Config** - Env variables, secrets management
+- **Production Infrastructure** - Vercel, hosting setup
+- **Database Deployment** - Supabase prod environment, migrations
+- **Monitoring** - Production health checks
+- **Rollback** - Deployment rollback procedures
+- **DNS/Domain** - Domain configuration, SSL
 
 ---
 
 ## 🚀 Your actual issues (based on your stack)
 
 Paste this into Notion as rows.
+
 
 ---
 
