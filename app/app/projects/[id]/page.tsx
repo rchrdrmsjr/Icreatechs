@@ -134,18 +134,20 @@ export default function ProjectDetailPage() {
     if (!monacoEditor) return;
 
     const root = document.documentElement;
-    const observer = new MutationObserver(() => {
-      const monaco = (monacoEditor as any)._standaloneKeybindingService?._getKeybindingService?.()
-        ? (window as any).monaco
-        : null;
-
+    const applyTheme = () => {
+      const monaco = (window as any).monaco;
       if (monaco?.editor) {
         registerShadcnTheme(monaco);
         monaco.editor.setTheme("shadcn");
       }
+    };
+
+    const observer = new MutationObserver(() => {
+      applyTheme();
     });
 
     observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    applyTheme();
 
     return () => observer.disconnect();
   }, [monacoEditor]);
@@ -220,6 +222,7 @@ export default function ProjectDetailPage() {
           err instanceof Error ? err.message : "Failed to save file";
         setEditorError(message);
         toast.error(message);
+        throw err;
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);
@@ -233,16 +236,20 @@ export default function ProjectDetailPage() {
 
   const saveActiveFile = useCallback(async () => {
     if (!activeFile) return;
-    await saveFile(
-      { id: activeFile.id, name: activeFile.name, content: activeFile.content },
-      "manual",
-    );
+    try {
+      await saveFile(
+        { id: activeFile.id, name: activeFile.name, content: activeFile.content },
+        "manual",
+      );
+    } catch {
+      // Errors are handled in saveFile
+    }
   }, [activeFile, saveFile]);
 
   const saveAllDirtyFiles = useCallback(async () => {
     const dirtyFiles = openFiles.filter((file) => file.isDirty);
     if (dirtyFiles.length === 0) return;
-    await Promise.all(
+    const results = await Promise.allSettled(
       dirtyFiles.map((file) =>
         saveFile(
           { id: file.id, name: file.name, content: file.content },
@@ -250,7 +257,22 @@ export default function ProjectDetailPage() {
         ),
       ),
     );
-    toast.success(`Saved ${dirtyFiles.length} file${dirtyFiles.length > 1 ? "s" : ""}`);
+
+    const successCount = results.filter((result) => result.status === "fulfilled")
+      .length;
+    const totalCount = dirtyFiles.length;
+
+    if (successCount === 0) {
+      toast.error("Failed to save files");
+      return;
+    }
+
+    if (successCount < totalCount) {
+      toast.success(`Saved ${successCount} of ${totalCount} files`);
+      return;
+    }
+
+    toast.success(`Saved ${totalCount} file${totalCount > 1 ? "s" : ""}`);
   }, [openFiles, saveFile]);
 
   useEffect(() => {
@@ -279,10 +301,12 @@ export default function ProjectDetailPage() {
     }
 
     autoSaveTimer.current = setTimeout(() => {
-      saveFile(
+      void saveFile(
         { id: activeFile.id, name: activeFile.name, content: activeFile.content },
         "auto",
-      );
+      ).catch(() => {
+        // Errors are handled in saveFile
+      });
     }, 1200);
 
     return () => {
@@ -290,7 +314,7 @@ export default function ProjectDetailPage() {
         clearTimeout(autoSaveTimer.current);
       }
     };
-  }, [activeFile, autoSaveEnabled, isSavingActive, saveActiveFile]);
+  }, [activeFile, autoSaveEnabled, isSavingActive, saveFile]);
 
   const handleOpenFile = (file: ExplorerFile) => {
     if (file.type !== "file") return;
@@ -308,27 +332,32 @@ export default function ProjectDetailPage() {
     const filesToLoad = openFiles.filter((file) => file.isLoading);
     if (filesToLoad.length === 0) return;
 
-    filesToLoad.forEach(async (file) => {
-      try {
-        const response = await fetch(
-          `/api/projects/${project.id}/files/${file.id}/content`,
-        );
+    const loadFiles = async () => {
+      setEditorError(null);
+      for (const file of filesToLoad) {
+        try {
+          const response = await fetch(
+            `/api/projects/${project.id}/files/${file.id}/content`,
+          );
 
-        if (!response.ok) {
+          if (!response.ok) {
+            const payload = await response.json();
+            throw new Error(payload.error || "Failed to load file content");
+          }
+
           const payload = await response.json();
-          throw new Error(payload.error || "Failed to load file content");
+          setFileContent(file.id, payload.content ?? "", false);
+          setFileLoading(file.id, false);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to load file content";
+          setEditorError(message);
+          setFileLoading(file.id, false);
         }
-
-        const payload = await response.json();
-        setFileContent(file.id, payload.content ?? "", false);
-        setEditorError(null);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load file content";
-        setEditorError(message);
-        setFileLoading(file.id, false);
       }
-    });
+    };
+
+    void loadFiles();
   }, [openFiles, project?.id, setFileContent, setFileLoading]);
 
   if (loading) {
@@ -433,7 +462,7 @@ export default function ProjectDetailPage() {
         <ResizablePanel defaultSize={50} minSize={30} maxSize={80}>
           <div className="h-full flex flex-col bg-muted/30">
             {/* Editor Tabs */}
-            <div className="flex items-center justify-between border-b border-border bg-background px-2 py-1">
+            <div className="flex items-center justify-between bg-background px-2 py-1">
               <EditorTabs savingIds={savingIds} />
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>Auto-save</span>

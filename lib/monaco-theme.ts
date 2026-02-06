@@ -47,6 +47,9 @@ const resolveBackground = (variable: string, fallback: string) => {
 };
 
 export function registerShadcnTheme(monaco: Monaco) {
+  if (typeof document === "undefined" || !document.documentElement) {
+    return;
+  }
   const isDark = document.documentElement.classList.contains("dark");
   const background = resolveBackground("--background", isDark ? "#0b0f14" : "#ffffff");
   const foreground = resolveCssVar("--foreground", isDark ? "#e6e6e6" : "#0f0f0f");

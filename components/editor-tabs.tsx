@@ -28,10 +28,17 @@ export function EditorTabs({ savingIds }: EditorTabsProps) {
   return (
     <div className="flex items-center gap-1 border-b border-border bg-background px-2 py-1">
       {orderedFiles.map((file) => (
-        <button
+        <div
           key={file.id}
-          type="button"
+          role="button"
+          tabIndex={0}
           onClick={() => setActiveFile(file.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setActiveFile(file.id);
+            }
+          }}
           className={cn(
             "group flex items-center gap-2 rounded px-3 py-1 text-xs",
             activeFileId === file.id ? "bg-accent" : "text-muted-foreground",
@@ -46,7 +53,10 @@ export function EditorTabs({ savingIds }: EditorTabsProps) {
               <span className="text-amber-400">*</span>
             ) : null}
           </span>
-          <span
+          <button
+            type="button"
+            aria-label="Close tab"
+            title="Close tab"
             className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
@@ -54,8 +64,8 @@ export function EditorTabs({ savingIds }: EditorTabsProps) {
             }}
           >
             <X className="h-3 w-3" />
-          </span>
-        </button>
+          </button>
+        </div>
       ))}
     </div>
   );

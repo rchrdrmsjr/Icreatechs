@@ -198,6 +198,8 @@ export async function PUT(
         const shouldStoreInStorage = sizeBytes > 10240;
         let storagePath: string | null = file.storage_path ?? null;
 
+        let removeStoragePath: string | null = null;
+
         if (shouldStoreInStorage) {
           const storageFilePath = `${id}/${file.path}`;
           const fileBlob = new Blob([content], { type: "text/plain" });
@@ -219,14 +221,7 @@ export async function PUT(
 
           storagePath = storageFilePath;
         } else if (storagePath) {
-          const { error: deleteError } = await supabase.storage
-            .from("project-files")
-            .remove([storagePath]);
-
-          if (deleteError) {
-            Sentry.captureException(deleteError);
-          }
-
+          removeStoragePath = storagePath;
           storagePath = null;
         }
 
@@ -246,6 +241,16 @@ export async function PUT(
             { error: "Failed to save file" },
             { status: 500 },
           );
+        }
+
+        if (removeStoragePath) {
+          const { error: deleteError } = await supabase.storage
+            .from("project-files")
+            .remove([removeStoragePath]);
+
+          if (deleteError) {
+            Sentry.captureException(deleteError);
+          }
         }
 
         return NextResponse.json({ saved: true });
