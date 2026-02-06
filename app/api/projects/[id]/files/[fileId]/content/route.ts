@@ -112,3 +112,155 @@ export async function GET(
     },
   );
 }
+
+// PUT /api/projects/[id]/files/[fileId]/content - Save file content
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; fileId: string }> },
+) {
+  return Sentry.startSpan(
+    {
+      op: "http.server",
+      name: "PUT /api/projects/[id]/files/[fileId]/content",
+    },
+    async () => {
+      try {
+        const { id, fileId } = await params;
+        const cookieStore = cookies();
+        const supabase = createClient(cookieStore);
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { content } = body;
+
+        if (typeof content !== "string") {
+          return NextResponse.json(
+            { error: "content must be a string" },
+            { status: 400 },
+          );
+        }
+
+        // Verify project access
+        const { data: project, error: projectError } = await supabase
+          .from("projects")
+          .select(
+            `
+            id,
+            workspaces!inner (
+              workspace_members!inner (
+                user_id
+              )
+            )
+          `,
+          )
+          .eq("id", id)
+          .eq("workspaces.workspace_members.user_id", user.id)
+          .single();
+
+        if (projectError || !project) {
+          return NextResponse.json(
+            { error: "Project not found or access denied" },
+            { status: 404 },
+          );
+        }
+
+        const { data: file, error: fileError } = await supabase
+          .from("files")
+          .select("id, project_id, type, path, storage_path")
+          .eq("id", fileId)
+          .eq("project_id", id)
+          .eq("is_deleted", false)
+          .single();
+
+        if (fileError || !file) {
+          return NextResponse.json(
+            { error: "File not found" },
+            { status: 404 },
+          );
+        }
+
+        if (file.type !== "file") {
+          return NextResponse.json(
+            { error: "Cannot save content for folders" },
+            { status: 400 },
+          );
+        }
+
+        const sizeBytes = new TextEncoder().encode(content).length;
+        const shouldStoreInStorage = sizeBytes > 10240;
+        let storagePath: string | null = file.storage_path ?? null;
+
+        let removeStoragePath: string | null = null;
+
+        if (shouldStoreInStorage) {
+          const storageFilePath = `${id}/${file.path}`;
+          const fileBlob = new Blob([content], { type: "text/plain" });
+
+          const { error: uploadError } = await supabase.storage
+            .from("project-files")
+            .upload(storageFilePath, fileBlob, {
+              contentType: "text/plain",
+              upsert: true,
+            });
+
+          if (uploadError) {
+            Sentry.captureException(uploadError);
+            return NextResponse.json(
+              { error: "Failed to upload file to storage" },
+              { status: 500 },
+            );
+          }
+
+          storagePath = storageFilePath;
+        } else if (storagePath) {
+          removeStoragePath = storagePath;
+          storagePath = null;
+        }
+
+        const { error: updateError } = await supabase
+          .from("files")
+          .update({
+            content: shouldStoreInStorage ? null : content,
+            size_bytes: sizeBytes,
+            storage_path: storagePath,
+            updated_by: user.id,
+          })
+          .eq("id", fileId);
+
+        if (updateError) {
+          Sentry.captureException(updateError);
+          return NextResponse.json(
+            { error: "Failed to save file" },
+            { status: 500 },
+          );
+        }
+
+        if (removeStoragePath) {
+          const { error: deleteError } = await supabase.storage
+            .from("project-files")
+            .remove([removeStoragePath]);
+
+          if (deleteError) {
+            Sentry.captureException(deleteError);
+          }
+        }
+
+        return NextResponse.json({ saved: true });
+      } catch (error) {
+        Sentry.captureException(error);
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      }
+    },
+  );
+}

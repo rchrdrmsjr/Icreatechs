@@ -48,6 +48,7 @@ interface FileNode extends FileRecord {
 
 interface FileExplorerProps {
   projectId: string;
+  onOpenFile?: (file: FileRecord) => void;
 }
 
 function sortNodes(nodes: FileNode[]) {
@@ -89,7 +90,7 @@ function buildTree(files: FileRecord[]) {
   return normalize(roots);
 }
 
-export function FileExplorer({ projectId }: FileExplorerProps) {
+export function FileExplorer({ projectId, onOpenFile }: FileExplorerProps) {
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -459,6 +460,8 @@ export function FileExplorer({ projectId }: FileExplorerProps) {
                 setSelectedId(node.id);
                 if (isFolder) {
                   toggleFolder(node.id);
+                } else {
+                  onOpenFile?.(node);
                 }
               }}
               onDragOver={(event) => {
