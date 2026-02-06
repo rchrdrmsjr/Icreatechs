@@ -24,6 +24,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { FileExplorer } from "@/components/file-explorer";
 
 interface Project {
   id: string;
@@ -179,35 +180,8 @@ export default function ProjectDetailPage() {
         <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
           <div className="h-full overflow-y-auto border-r border-border bg-background">
             <div className="p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
-                <FileCode className="h-3 w-3" />
-                Files
-              </div>
-              <div className="space-y-1 text-sm">
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FileCode className="h-4 w-4 text-blue-500" />
-                  <span>index.tsx</span>
-                </div>
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FileCode className="h-4 w-4 text-blue-500" />
-                  <span>app.tsx</span>
-                </div>
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FileCode className="h-4 w-4 text-purple-500" />
-                  <span>styles.css</span>
-                </div>
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FolderOpen className="h-4 w-4 text-yellow-500" />
-                  <span>components/</span>
-                </div>
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FolderOpen className="h-4 w-4 text-yellow-500" />
-                  <span>utils/</span>
-                </div>
-                <div className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent cursor-pointer">
-                  <FileCode className="h-4 w-4 text-green-500" />
-                  <span>package.json</span>
-                </div>
+              <div className="text-sm">
+                <FileExplorer projectId={project.id} />
               </div>
             </div>
           </div>
