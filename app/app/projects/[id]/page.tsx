@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import Editor from "@monaco-editor/react";
+import type { editor as MonacoEditor } from "monaco-editor";
 import {
   ArrowLeft,
   Loader2,
@@ -10,7 +12,6 @@ import {
   Upload,
   Share2,
   FolderOpen,
-  FileCode,
   Terminal,
   Monitor,
   Code,
@@ -18,13 +19,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
-import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { Switch } from "@/components/ui/switch";
 import { FileExplorer } from "@/components/file-explorer";
+import { EditorTabs } from "@/components/editor-tabs";
+import { useEditorStore } from "@/lib/editor-store";
+import { registerShadcnTheme } from "@/lib/monaco-theme";
 
 interface Project {
   id: string;
@@ -42,19 +47,108 @@ interface Project {
 
 type ViewMode = "code" | "preview";
 
+interface ExplorerFile {
+  id: string;
+  name: string;
+  path: string;
+  type: "file" | "folder";
+}
+
+const getLanguageFromName = (name: string) => {
+  const ext = name.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "ts":
+      return "typescript";
+    case "tsx":
+      return "typescript";
+    case "js":
+      return "javascript";
+    case "jsx":
+      return "javascript";
+    case "json":
+      return "json";
+    case "html":
+      return "html";
+    case "css":
+    case "scss":
+    case "sass":
+      return "scss";
+    case "md":
+    case "mdx":
+      return "markdown";
+    case "py":
+      return "python";
+    case "go":
+      return "go";
+    case "rs":
+      return "rust";
+    case "java":
+      return "java";
+    case "cs":
+      return "csharp";
+    case "cpp":
+    case "c":
+    case "h":
+      return "cpp";
+    case "xml":
+      return "xml";
+    default:
+      return "plaintext";
+  }
+};
+
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("code");
+  const [monacoEditor, setMonacoEditor] = useState<MonacoEditor.IStandaloneCodeEditor | null>(
+    null,
+  );
+  const openFiles = useEditorStore((state) => state.openFiles);
+  const activeFileId = useEditorStore((state) => state.activeFileId);
+  const openFile = useEditorStore((state) => state.openFile);
+  const setFileContent = useEditorStore((state) => state.setFileContent);
+  const setFileLoading = useEditorStore((state) => state.setFileLoading);
+
+  const activeFile = useMemo(
+    () => openFiles.find((file) => file.id === activeFileId) ?? null,
+    [activeFileId, openFiles],
+  );
+  const isSavingActive = activeFileId ? savingIds.has(activeFileId) : false;
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAutoSaveToastAt = useRef<Map<string, number>>(new Map());
+  const autoSaveToastThrottleMs = 5000;
 
   useEffect(() => {
     if (params.id) {
       fetchProject(params.id as string);
     }
   }, [params.id]);
+
+  useEffect(() => {
+    if (!monacoEditor) return;
+
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      const monaco = (monacoEditor as any)._standaloneKeybindingService?._getKeybindingService?.()
+        ? (window as any).monaco
+        : null;
+
+      if (monaco?.editor) {
+        registerShadcnTheme(monaco);
+        monaco.editor.setTheme("shadcn");
+      }
+    });
+
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+    return () => observer.disconnect();
+  }, [monacoEditor]);
 
   const fetchProject = async (id: string) => {
     return Sentry.startSpan(
@@ -86,13 +180,156 @@ export default function ProjectDetailPage() {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-    } catch {
-      return "recently";
+  const saveFile = useCallback(
+    async (
+      file: { id: string; name: string; content: string },
+      source: "manual" | "auto" | "all" = "manual",
+    ) => {
+      if (!project?.id) return;
+      setSavingIds((prev) => new Set(prev).add(file.id));
+      setEditorError(null);
+
+      try {
+        const response = await fetch(
+          `/api/projects/${project.id}/files/${file.id}/content`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: file.content }),
+          },
+        );
+
+        if (!response.ok) {
+          const payload = await response.json();
+          throw new Error(payload.error || "Failed to save file");
+        }
+
+        setFileContent(file.id, file.content, false);
+        if (source === "auto") {
+          const now = Date.now();
+          const lastToast = lastAutoSaveToastAt.current.get(file.id) ?? 0;
+          if (now - lastToast >= autoSaveToastThrottleMs) {
+            lastAutoSaveToastAt.current.set(file.id, now);
+            toast.success(`Auto-saved ${file.name}`, {
+              id: `autosave-${file.id}`,
+            });
+          }
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to save file";
+        setEditorError(message);
+        toast.error(message);
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(file.id);
+          return next;
+        });
+      }
+    },
+    [project?.id, setFileContent],
+  );
+
+  const saveActiveFile = useCallback(async () => {
+    if (!activeFile) return;
+    await saveFile(
+      { id: activeFile.id, name: activeFile.name, content: activeFile.content },
+      "manual",
+    );
+  }, [activeFile, saveFile]);
+
+  const saveAllDirtyFiles = useCallback(async () => {
+    const dirtyFiles = openFiles.filter((file) => file.isDirty);
+    if (dirtyFiles.length === 0) return;
+    await Promise.all(
+      dirtyFiles.map((file) =>
+        saveFile(
+          { id: file.id, name: file.name, content: file.content },
+          "all",
+        ),
+      ),
+    );
+    toast.success(`Saved ${dirtyFiles.length} file${dirtyFiles.length > 1 ? "s" : ""}`);
+  }, [openFiles, saveFile]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          saveAllDirtyFiles();
+        } else {
+          saveActiveFile();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [saveActiveFile, saveAllDirtyFiles]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    if (!activeFile || !activeFile.isDirty) return;
+    if (isSavingActive) return;
+
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
     }
+
+    autoSaveTimer.current = setTimeout(() => {
+      saveFile(
+        { id: activeFile.id, name: activeFile.name, content: activeFile.content },
+        "auto",
+      );
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+      }
+    };
+  }, [activeFile, autoSaveEnabled, isSavingActive, saveActiveFile]);
+
+  const handleOpenFile = (file: ExplorerFile) => {
+    if (file.type !== "file") return;
+    openFile({
+      id: file.id,
+      name: file.name,
+      path: file.path,
+      language: getLanguageFromName(file.name),
+    });
   };
+
+  useEffect(() => {
+    if (!project?.id) return;
+
+    const filesToLoad = openFiles.filter((file) => file.isLoading);
+    if (filesToLoad.length === 0) return;
+
+    filesToLoad.forEach(async (file) => {
+      try {
+        const response = await fetch(
+          `/api/projects/${project.id}/files/${file.id}/content`,
+        );
+
+        if (!response.ok) {
+          const payload = await response.json();
+          throw new Error(payload.error || "Failed to load file content");
+        }
+
+        const payload = await response.json();
+        setFileContent(file.id, payload.content ?? "", false);
+        setEditorError(null);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load file content";
+        setEditorError(message);
+        setFileLoading(file.id, false);
+      }
+    });
+  }, [openFiles, project?.id, setFileContent, setFileLoading]);
 
   if (loading) {
     return (
@@ -181,7 +418,10 @@ export default function ProjectDetailPage() {
           <div className="h-full overflow-y-auto border-r border-border bg-background">
             <div className="p-3">
               <div className="text-sm">
-                <FileExplorer projectId={project.id} />
+                <FileExplorer
+                  projectId={project.id}
+                  onOpenFile={handleOpenFile}
+                />
               </div>
             </div>
           </div>
@@ -193,34 +433,70 @@ export default function ProjectDetailPage() {
         <ResizablePanel defaultSize={50} minSize={30} maxSize={80}>
           <div className="h-full flex flex-col bg-muted/30">
             {/* Editor Tabs */}
-            <div className="flex items-center gap-1 border-b border-border bg-background px-2 py-1">
-              <div className="flex items-center gap-2 rounded bg-accent px-3 py-1.5 text-sm">
-                <FileCode className="h-3 w-3" />
-                <span>index.tsx</span>
-                <button className="ml-1 hover:text-destructive">×</button>
+            <div className="flex items-center justify-between border-b border-border bg-background px-2 py-1">
+              <EditorTabs savingIds={savingIds} />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Auto-save</span>
+                <Switch
+                  checked={autoSaveEnabled}
+                  onCheckedChange={setAutoSaveEnabled}
+                  size="sm"
+                  aria-label="Toggle auto-save"
+                />
               </div>
             </div>
 
             {/* Editor Container */}
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="text-center space-y-3">
-                <div className="mx-auto w-16 h-16 rounded-full bg-accent flex items-center justify-center">
-                  <Code className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="text-lg font-semibold">Monaco Editor</div>
-                  <div className="text-sm text-muted-foreground">
-                    Code editor will be available in Sprint 2
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {project.language && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-1">
-                      Language: {project.language}
-                    </span>
+            <div className="flex-1">
+              {(editorError || isSavingActive) && (
+                <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs">
+                  <span className={editorError ? "text-destructive" : "text-muted-foreground"}>
+                    {editorError ?? "Saving changes..."}
+                  </span>
+                  {isSavingActive && (
+                    <span className="text-muted-foreground">⌘/Ctrl+S</span>
                   )}
                 </div>
-              </div>
+              )}
+              {activeFile ? (
+                <Editor
+                  height="100%"
+                  theme="shadcn"
+                  language={activeFile.language}
+                  value={activeFile.content}
+                  onMount={(editor, monaco) => {
+                    registerShadcnTheme(monaco);
+                    monaco.editor.setTheme("shadcn");
+                    setMonacoEditor(editor);
+                    (window as any).monaco = monaco;
+                  }}
+                  onChange={(value) => {
+                    if (!activeFileId) return;
+                    setFileContent(activeFileId, value ?? "", true);
+                  }}
+                  options={{
+                    fontSize: 13,
+                    lineHeight: 20,
+                    fontFamily: "var(--font-geist-mono)",
+                    minimap: { enabled: false },
+                    wordWrap: "on",
+                    smoothScrolling: true,
+                    scrollBeyondLastLine: false,
+                    renderLineHighlight: "line",
+                    padding: { top: 12, bottom: 12 },
+                  }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-8">
+                  <div className="text-center space-y-3">
+                    <div>
+                      <div className="text-sm text-muted-foreground">
+                        Select a file to start editing
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </ResizablePanel>
