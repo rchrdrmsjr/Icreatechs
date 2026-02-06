@@ -479,7 +479,7 @@ export function FileExplorer({ projectId }: FileExplorerProps) {
                 setDropTargetId(null);
               }}
               className={cn(
-                "flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent",
+                "flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-accent",
                 selectedId === node.id && "bg-accent",
                 dropTargetId === node.id && "ring-1 ring-primary"
               )}
@@ -630,7 +630,7 @@ export function FileExplorer({ projectId }: FileExplorerProps) {
               No files yet. Create your first file or folder.
             </div>
           ) : (
-            <div className="space-y-1 p-1">
+            <div className="space-y-0.5 p-1">
               {tree.map((node) => renderNode(node, 0))}
             </div>
           )}
