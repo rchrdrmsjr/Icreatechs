@@ -18,6 +18,7 @@ interface EditorState {
   closeFile: (fileId: string) => void;
   setActiveFile: (fileId: string) => void;
   setFileContent: (fileId: string, content: string, isDirty?: boolean) => void;
+  setFileDirty: (fileId: string, isDirty: boolean) => void;
   setFileLoading: (fileId: string, isLoading: boolean) => void;
   touchMru: (fileId: string) => void;
 }
@@ -77,6 +78,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         file.id === fileId
           ? { ...file, content, isDirty, isLoading: false }
           : file,
+      ),
+    });
+  },
+  setFileDirty: (fileId, isDirty) => {
+    set({
+      openFiles: get().openFiles.map((file) =>
+        file.id === fileId ? { ...file, isDirty, isLoading: false } : file,
       ),
     });
   },

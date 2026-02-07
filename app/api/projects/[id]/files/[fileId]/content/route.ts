@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
+
+const createStorageClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
+};
 
 // GET /api/projects/[id]/files/[fileId]/content - Get file content
 export async function GET(
@@ -84,7 +98,8 @@ export async function GET(
 
         // Otherwise, fetch from storage
         if (file.storage_path) {
-          const { data, error: downloadError } = await supabase.storage
+          const storageClient = createStorageClient();
+          const { data, error: downloadError } = await storageClient.storage
             .from("project-files")
             .download(file.storage_path);
 
@@ -194,43 +209,35 @@ export async function PUT(
           );
         }
 
+        const storageClient = createStorageClient();
         const sizeBytes = new TextEncoder().encode(content).length;
-        const shouldStoreInStorage = sizeBytes > 10240;
-        let storagePath: string | null = file.storage_path ?? null;
+        const storageFilePath = file.storage_path ?? `${id}/${file.path}`;
+        const fileBlob = new Blob([content], { type: "text/plain" });
 
-        let removeStoragePath: string | null = null;
+        const { error: uploadError } = await storageClient.storage
+          .from("project-files")
+          .upload(storageFilePath, fileBlob, {
+            contentType: "text/plain",
+            upsert: true,
+          });
 
-        if (shouldStoreInStorage) {
-          const storageFilePath = `${id}/${file.path}`;
-          const fileBlob = new Blob([content], { type: "text/plain" });
-
-          const { error: uploadError } = await supabase.storage
-            .from("project-files")
-            .upload(storageFilePath, fileBlob, {
-              contentType: "text/plain",
-              upsert: true,
-            });
-
-          if (uploadError) {
-            Sentry.captureException(uploadError);
-            return NextResponse.json(
-              { error: "Failed to upload file to storage" },
-              { status: 500 },
-            );
-          }
-
-          storagePath = storageFilePath;
-        } else if (storagePath) {
-          removeStoragePath = storagePath;
-          storagePath = null;
+        if (uploadError) {
+          Sentry.captureException(uploadError);
+          return NextResponse.json(
+            {
+              error: "Failed to upload file to storage",
+              details: uploadError.message,
+            },
+            { status: 500 },
+          );
         }
 
         const { error: updateError } = await supabase
           .from("files")
           .update({
-            content: shouldStoreInStorage ? null : content,
+            content: null,
             size_bytes: sizeBytes,
-            storage_path: storagePath,
+            storage_path: storageFilePath,
             updated_by: user.id,
           })
           .eq("id", fileId);
@@ -241,16 +248,6 @@ export async function PUT(
             { error: "Failed to save file" },
             { status: 500 },
           );
-        }
-
-        if (removeStoragePath) {
-          const { error: deleteError } = await supabase.storage
-            .from("project-files")
-            .remove([removeStoragePath]);
-
-          if (deleteError) {
-            Sentry.captureException(deleteError);
-          }
         }
 
         return NextResponse.json({ saved: true });

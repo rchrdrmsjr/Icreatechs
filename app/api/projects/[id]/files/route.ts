@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,19 @@ const normalizePath = (parentPath: string | null, name: string) => {
   const trimmedName = name.trim();
   const basePath = parentPath ? parentPath.replace(/\/+$|\/$/g, "") : "";
   return basePath ? `${basePath}/${trimmedName}` : trimmedName;
+};
+
+const createStorageClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
 };
 
 // GET /api/projects/[id]/files - List files for a project
@@ -33,7 +47,13 @@ export async function GET(
         } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+          return NextResponse.json(
+            {
+              error: "Unauthorized",
+              details: authError?.message,
+            },
+            { status: 401 },
+          );
         }
 
         const { data: project, error: projectError } = await supabase
@@ -54,7 +74,10 @@ export async function GET(
 
         if (projectError || !project) {
           return NextResponse.json(
-            { error: "Project not found or access denied" },
+            {
+              error: "Project not found or access denied",
+              details: projectError?.message,
+            },
             { status: 404 },
           );
         }
@@ -184,13 +207,14 @@ export async function POST(
             : null;
 
         let storagePath: string | null = null;
-        
-        // Upload to Supabase Storage for files with content > 10KB
-        if (type === "file" && safeContent && sizeBytes && sizeBytes > 10240) {
+        const storageClient = createStorageClient();
+
+        // Always store file contents in Supabase Storage.
+        if (type === "file") {
           const storageFilePath = `${id}/${path}`;
-          const fileBlob = new Blob([safeContent], { type: "text/plain" });
-          
-          const { error: uploadError } = await supabase.storage
+          const fileBlob = new Blob([safeContent ?? ""], { type: "text/plain" });
+
+          const { error: uploadError } = await storageClient.storage
             .from("project-files")
             .upload(storageFilePath, fileBlob, {
               contentType: "text/plain",
@@ -216,7 +240,7 @@ export async function POST(
             type,
             parent_id: parent_id || null,
             path,
-            content: storagePath ? null : safeContent, // Store in DB only for small files
+            content: null,
             size_bytes: sizeBytes,
             storage_path: storagePath,
             created_by: user.id,
