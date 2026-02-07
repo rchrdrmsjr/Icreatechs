@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileExplorer } from "@/components/file-explorer";
 import { EditorTabs } from "@/components/editor-tabs";
 import { useEditorStore } from "@/lib/editor-store";
+import { ConversationPanel } from "@/components/conversations/conversation-panel";
 
 interface Project {
   id: string;
@@ -867,15 +868,12 @@ export default function ProjectDetailPage() {
               <ResizablePanelGroup orientation="horizontal" className="flex-1">
                 <ResizablePanel defaultSize={30} minSize={20}>
                   <div className="h-full p-4">
-                    <div className="h-full rounded-lg border border-border bg-muted/20 p-4 flex flex-col min-h-0">
-                      <div className="text-xs font-medium text-muted-foreground mb-3">
-                        AI Chat Conversation
-                      </div>
-                      <div className="flex-1 overflow-y-auto text-sm text-muted-foreground">
-                        <div className="rounded-md bg-background/60 p-3">
-                          Start a prompt to see the conversation here.
-                        </div>
-                      </div>
+                    <div className="h-full min-h-0">
+                      <ConversationPanel
+                        projectId={project.id}
+                        aiProvider={aiProvider}
+                        aiModel={aiModel}
+                      />
                     </div>
                   </div>
                 </ResizablePanel>
