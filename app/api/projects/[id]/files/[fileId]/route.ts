@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
+
+const createStorageClient = () => createAdminClient();
 
 const normalizePath = (parentPath: string | null, name: string) => {
   const trimmedName = name.trim();
@@ -216,10 +219,11 @@ export async function PATCH(
 
         // Move file in storage if it has storage_path and path changed
         if (file.storage_path && newPath !== oldPath) {
+          const storageClient = createStorageClient();
           const oldStoragePath = file.storage_path;
           const newStoragePath = `${id}/${newPath}`;
 
-          const { error: moveError } = await supabase.storage
+          const { error: moveError } = await storageClient.storage
             .from("project-files")
             .move(oldStoragePath, newStoragePath);
 
@@ -257,6 +261,7 @@ export async function PATCH(
           if (descendantsError) {
             Sentry.captureException(descendantsError);
           } else if (descendants && descendants.length > 0) {
+            const storageClient = createStorageClient();
             // Update descendant paths and storage_paths
             await Promise.all(
               descendants.map(async (child) => {
@@ -269,7 +274,7 @@ export async function PATCH(
                 // Move in storage if has storage_path
                 if (child.storage_path) {
                   const childNewStoragePath = `${id}/${childNewPath}`;
-                  const { error: moveError } = await supabase.storage
+                  const { error: moveError } = await storageClient.storage
                     .from("project-files")
                     .move(child.storage_path, childNewStoragePath);
 
@@ -354,9 +359,11 @@ export async function DELETE(
           .update({ is_deleted: true, updated_by: user.id })
           .eq("id", fileId);
 
+        const storageClient = createStorageClient();
+
         // Delete from storage if it exists
         if (file.storage_path) {
-          const { error: storageError } = await supabase.storage
+          const { error: storageError } = await storageClient.storage
             .from("project-files")
             .remove([file.storage_path]);
 
@@ -389,7 +396,7 @@ export async function DELETE(
               .filter((path): path is string => path !== null);
 
             if (storagePaths.length > 0) {
-              const { error: storageError } = await supabase.storage
+              const { error: storageError } = await storageClient.storage
                 .from("project-files")
                 .remove(storagePaths);
 

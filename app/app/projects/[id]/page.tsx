@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Editor from "@monaco-editor/react";
-import type { editor as MonacoEditor } from "monaco-editor";
+import { CodeEditor, type CodeEditorHandle } from "@/components/code-editor";
 import {
   ArrowLeft,
   Loader2,
@@ -14,8 +13,9 @@ import {
   FolderOpen,
   Terminal,
   Monitor,
-  Code,
   Eye,
+  Wand2,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
@@ -26,10 +26,20 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { FileExplorer } from "@/components/file-explorer";
 import { EditorTabs } from "@/components/editor-tabs";
 import { useEditorStore } from "@/lib/editor-store";
-import { registerShadcnTheme } from "@/lib/monaco-theme";
 
 interface Project {
   id: string;
@@ -105,14 +115,34 @@ export default function ProjectDetailPage() {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<"code" | "preview">("code");
   const [viewMode, setViewMode] = useState<ViewMode>("code");
-  const [monacoEditor, setMonacoEditor] = useState<MonacoEditor.IStandaloneCodeEditor | null>(
-    null,
+  const editorRef = useRef<CodeEditorHandle | null>(null);
+  const contentByIdRef = useRef<Map<string, string>>(new Map());
+  const [aiProvider, setAiProvider] = useState<"gemini" | "groq">("gemini");
+  const [aiModel, setAiModel] = useState("gemini-2.5-flash");
+  const [selectionText, setSelectionText] = useState("");
+  const [selectionStats, setSelectionStats] = useState({ lines: 0, chars: 0 });
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+  const [quickEditInstruction, setQuickEditInstruction] = useState("");
+  const [quickEditIncludeExplanation, setQuickEditIncludeExplanation] = useState(false);
+  const [quickEditExplanation, setQuickEditExplanation] = useState<string | null>(null);
+  const [quickEditLoading, setQuickEditLoading] = useState(false);
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapeLoading, setScrapeLoading] = useState<"blocking" | "queue" | null>(null);
+  const [scrapeResult, setScrapeResult] = useState<string | null>(null);
+  const availableModels = useMemo<string[]>(
+    () =>
+      aiProvider === "groq"
+        ? ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+        : ["gemini-2.5-flash", "gemini-2.0-flash"],
+    [aiProvider],
   );
   const openFiles = useEditorStore((state) => state.openFiles);
   const activeFileId = useEditorStore((state) => state.activeFileId);
   const openFile = useEditorStore((state) => state.openFile);
   const setFileContent = useEditorStore((state) => state.setFileContent);
+  const setFileDirty = useEditorStore((state) => state.setFileDirty);
   const setFileLoading = useEditorStore((state) => state.setFileLoading);
 
   const activeFile = useMemo(
@@ -130,27 +160,151 @@ export default function ProjectDetailPage() {
     }
   }, [params.id]);
 
+  const getContentForFile = useCallback(
+    (fileId: string, fallback?: string) => {
+      const cached = contentByIdRef.current.get(fileId);
+      return cached ?? fallback ?? "";
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (!monacoEditor) return;
+    if (!quickEditOpen) {
+      setQuickEditInstruction("");
+      setQuickEditExplanation(null);
+    }
+  }, [quickEditOpen]);
 
-    const root = document.documentElement;
-    const applyTheme = () => {
-      const monaco = (window as any).monaco;
-      if (monaco?.editor) {
-        registerShadcnTheme(monaco);
-        monaco.editor.setTheme("shadcn");
+  useEffect(() => {
+    if (!availableModels.includes(aiModel)) {
+      setAiModel(availableModels[0]);
+    }
+  }, [aiModel, availableModels]);
+
+  const openQuickEdit = useCallback(() => {
+    const selection = editorRef.current?.getSelectionText() ?? "";
+    if (!selection.trim()) {
+      toast("Select code to edit first.");
+      return;
+    }
+    setQuickEditOpen(true);
+  }, []);
+
+  const handleQuickEditSubmit = useCallback(async () => {
+    if (!activeFile) return;
+    const selectionText = editorRef.current?.getSelectionText() ?? "";
+    if (!selectionText.trim()) {
+      toast("Select code to edit first.");
+      return;
+    }
+
+    const instruction = quickEditInstruction.trim();
+    if (!instruction) {
+      toast("Add an instruction for the edit.");
+      return;
+    }
+
+    setQuickEditLoading(true);
+    setQuickEditExplanation(null);
+
+    try {
+      const response = await fetch("/api/ai/edit-selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selection: selectionText,
+          instruction,
+          language: activeFile.language,
+          filePath: activeFile.path,
+          aiProvider,
+          model: aiModel,
+          includeExplanation: quickEditIncludeExplanation,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to edit selection");
       }
-    };
 
-    const observer = new MutationObserver(() => {
-      applyTheme();
-    });
+      const updated = payload?.data?.updated ?? "";
+      const explanation = payload?.data?.explanation ?? null;
+      if (!updated.trim()) {
+        throw new Error("AI returned empty output");
+      }
 
-    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
-    applyTheme();
+      editorRef.current?.replaceSelection(updated);
+      setQuickEditExplanation(explanation);
+      if (!quickEditIncludeExplanation) {
+        setQuickEditOpen(false);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Quick edit failed";
+      toast.error(message);
+    } finally {
+      setQuickEditLoading(false);
+    }
+  }, [
+    activeFile,
+    aiModel,
+    aiProvider,
+    quickEditIncludeExplanation,
+    quickEditInstruction,
+  ]);
 
-    return () => observer.disconnect();
-  }, [monacoEditor]);
+  const handleSelectionChange = useCallback((selection: string) => {
+    if (!selection) {
+      setSelectionText("");
+      setSelectionStats({ lines: 0, chars: 0 });
+      return;
+    }
+    setSelectionText(selection);
+    setSelectionStats({ lines: selection.split("\n").length, chars: selection.length });
+  }, []);
+
+  const handleScrape = useCallback(
+    async (mode: "blocking" | "queue") => {
+      const url = scrapeUrl.trim();
+      if (!url) {
+        toast("Enter a URL to scrape.");
+        return;
+      }
+
+      setScrapeLoading(mode);
+      setScrapeResult(null);
+
+      try {
+        const response = await fetch(
+          mode === "blocking" ? "/api/firecrawl/blocking" : "/api/firecrawl/non-blocking",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, formats: ["markdown"] }),
+          },
+        );
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "Failed to scrape URL");
+        }
+
+        if (mode === "queue") {
+          setScrapeResult(`Queued job ${payload.requestId}`);
+        } else {
+          const markdown = payload?.data?.markdown ?? "";
+          setScrapeResult(
+            markdown ? markdown.slice(0, 800) : "Scrape completed with no markdown.",
+          );
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to scrape URL";
+        toast.error(message);
+      } finally {
+        setScrapeLoading(null);
+      }
+    },
+    [scrapeUrl],
+  );
 
   const fetchProject = async (id: string) => {
     return Sentry.startSpan(
@@ -191,13 +345,15 @@ export default function ProjectDetailPage() {
       setSavingIds((prev) => new Set(prev).add(file.id));
       setEditorError(null);
 
+      const latestContent = getContentForFile(file.id, file.content);
+
       try {
         const response = await fetch(
           `/api/projects/${project.id}/files/${file.id}/content`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: file.content }),
+            body: JSON.stringify({ content: latestContent }),
           },
         );
 
@@ -206,7 +362,8 @@ export default function ProjectDetailPage() {
           throw new Error(payload.error || "Failed to save file");
         }
 
-        setFileContent(file.id, file.content, false);
+        contentByIdRef.current.set(file.id, latestContent);
+        setFileContent(file.id, latestContent, false);
         if (source === "auto") {
           const now = Date.now();
           const lastToast = lastAutoSaveToastAt.current.get(file.id) ?? 0;
@@ -231,7 +388,7 @@ export default function ProjectDetailPage() {
         });
       }
     },
-    [project?.id, setFileContent],
+    [getContentForFile, project?.id, setFileContent],
   );
 
   const saveActiveFile = useCallback(async () => {
@@ -292,6 +449,18 @@ export default function ProjectDetailPage() {
   }, [saveActiveFile, saveAllDirtyFiles]);
 
   useEffect(() => {
+    const handleQuickEditKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openQuickEdit();
+      }
+    };
+
+    window.addEventListener("keydown", handleQuickEditKey);
+    return () => window.removeEventListener("keydown", handleQuickEditKey);
+  }, [openQuickEdit]);
+
+  useEffect(() => {
     if (!autoSaveEnabled) return;
     if (!activeFile || !activeFile.isDirty) return;
     if (isSavingActive) return;
@@ -315,6 +484,7 @@ export default function ProjectDetailPage() {
       }
     };
   }, [activeFile, autoSaveEnabled, isSavingActive, saveFile]);
+
 
   const handleOpenFile = (file: ExplorerFile) => {
     if (file.type !== "file") return;
@@ -346,7 +516,9 @@ export default function ProjectDetailPage() {
           }
 
           const payload = await response.json();
-          setFileContent(file.id, payload.content ?? "", false);
+          const loadedContent = payload.content ?? "";
+          contentByIdRef.current.set(file.id, loadedContent);
+          setFileContent(file.id, loadedContent, false);
           setFileLoading(file.id, false);
         } catch (err) {
           const message =
@@ -405,6 +577,25 @@ export default function ProjectDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={workspaceMode === "code" ? "secondary" : "ghost"}
+            onClick={() => setWorkspaceMode("code")}
+          >
+            Code
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={workspaceMode === "preview" ? "secondary" : "ghost"}
+            onClick={() => setWorkspaceMode("preview")}
+          >
+            Preview
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
           <button
             type="button"
             className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
@@ -442,169 +633,323 @@ export default function ProjectDetailPage() {
 
       {/* IDE Layout with Resizable Panels */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
-        {/* File Explorer Panel */}
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-          <div className="h-full overflow-y-auto border-r border-border bg-background">
-            <div className="p-3">
-              <div className="text-sm">
-                <FileExplorer
-                  projectId={project.id}
-                  onOpenFile={handleOpenFile}
-                />
+        {workspaceMode === "code" ? (
+          <>
+            {/* File Explorer Panel */}
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+              <div className="h-full overflow-y-auto border-r border-border bg-background">
+                <div className="p-3">
+                  <div className="text-sm">
+                    <FileExplorer
+                      projectId={project.id}
+                      onOpenFile={handleOpenFile}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </ResizablePanel>
+            </ResizablePanel>
 
-        <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-        {/* Code Editor Panel */}
-        <ResizablePanel defaultSize={50} minSize={30} maxSize={80}>
-          <div className="h-full flex flex-col bg-muted/30">
-            {/* Editor Tabs */}
-            <div className="flex items-center justify-between bg-background px-2 py-1">
-              <EditorTabs savingIds={savingIds} />
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Auto-save</span>
-                <Switch
-                  checked={autoSaveEnabled}
-                  onCheckedChange={setAutoSaveEnabled}
-                  size="sm"
-                  aria-label="Toggle auto-save"
-                />
-              </div>
-            </div>
-
-            {/* Editor Container */}
-            <div className="flex-1">
-              {(editorError || isSavingActive) && (
-                <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs">
-                  <span className={editorError ? "text-destructive" : "text-muted-foreground"}>
-                    {editorError ?? "Saving changes..."}
-                  </span>
-                  {isSavingActive && (
-                    <span className="text-muted-foreground">⌘/Ctrl+S</span>
+            {/* Code Editor Panel */}
+            <ResizablePanel defaultSize={50} minSize={30} maxSize={80}>
+              <div className="h-full flex flex-col bg-muted/30">
+                {/* Editor Tabs */}
+                <div className="flex items-center justify-between bg-background px-2 py-1">
+                  <EditorTabs savingIds={savingIds} />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Auto-save</span>
+                    <Switch
+                      checked={autoSaveEnabled}
+                      onCheckedChange={setAutoSaveEnabled}
+                      size="sm"
+                      aria-label="Toggle auto-save"
+                    />
+                  </div>
+                </div>
+                {/* Editor Container */}
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  {(editorError || isSavingActive) && (
+                    <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 text-xs">
+                      <span className={editorError ? "text-destructive" : "text-muted-foreground"}>
+                        {editorError ?? "Saving changes..."}
+                      </span>
+                      {isSavingActive && (
+                        <span className="text-muted-foreground">⌘/Ctrl+S</span>
+                      )}
+                    </div>
+                  )}
+                  {activeFile ? (
+                    <CodeEditor
+                      ref={editorRef}
+                      key={activeFile.id}
+                      fileName={activeFile.name}
+                      value={contentByIdRef.current.get(activeFile.id) ?? activeFile.content}
+                      isDirty={activeFile.isDirty}
+                      onSelectionChange={handleSelectionChange}
+                      onChange={(value) => {
+                        if (!activeFileId) return;
+                        contentByIdRef.current.set(activeFileId, value);
+                        setFileDirty(activeFileId, true);
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-8">
+                      <div className="text-center space-y-3">
+                        <div>
+                          <div className="text-sm text-muted-foreground">
+                            Select a file to start editing
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
-              {activeFile ? (
-                <Editor
-                  height="100%"
-                  theme="shadcn"
-                  language={activeFile.language}
-                  value={activeFile.content}
-                  onMount={(editor, monaco) => {
-                    registerShadcnTheme(monaco);
-                    monaco.editor.setTheme("shadcn");
-                    setMonacoEditor(editor);
-                    (window as any).monaco = monaco;
-                  }}
-                  onChange={(value) => {
-                    if (!activeFileId) return;
-                    setFileContent(activeFileId, value ?? "", true);
-                  }}
-                  options={{
-                    fontSize: 13,
-                    lineHeight: 20,
-                    fontFamily: "var(--font-geist-mono)",
-                    minimap: { enabled: false },
-                    wordWrap: "on",
-                    smoothScrolling: true,
-                    scrollBeyondLastLine: false,
-                    renderLineHighlight: "line",
-                    padding: { top: 12, bottom: 12 },
-                  }}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center p-8">
-                  <div className="text-center space-y-3">
-                    <div>
-                      <div className="text-sm text-muted-foreground">
-                        Select a file to start editing
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </ResizablePanel>
+              </div>
+            </ResizablePanel>
 
-        <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-        {/* Preview/Terminal Panel with Tab Switching */}
-        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-          <div className="h-full flex flex-col bg-background">
-            {/* Code/Preview Tab Switcher */}
-            <div className="flex items-center border-b border-border">
-              <button
-                type="button"
-                onClick={() => setViewMode("code")}
-                className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
-                  viewMode === "code"
-                    ? "border-foreground text-foreground font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Terminal className="h-4 w-4" />
-                Terminal
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("preview")}
-                className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
-                  viewMode === "preview"
-                    ? "border-foreground text-foreground font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Monitor className="h-4 w-4" />
-                Preview
-              </button>
-            </div>
-
-            {/* Terminal/Preview Content */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {viewMode === "code" ? (
-                <div className="space-y-3">
-                  <div className="text-sm font-medium flex items-center gap-2">
+            {/* Preview/Terminal Panel with Tab Switching */}
+            <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+              <div className="h-full flex flex-col bg-background">
+                {/* Code/Preview Tab Switcher */}
+                <div className="flex items-center border-b border-border">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("code")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
+                      viewMode === "code"
+                        ? "border-foreground text-foreground font-medium"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
                     <Terminal className="h-4 w-4" />
-                    Terminal Output
-                  </div>
-                  <div className="rounded-lg bg-muted p-3 font-mono text-xs">
-                    <div className="text-green-500">$ npm run dev</div>
-                    <div className="text-muted-foreground mt-2">
-                      Ready on http://localhost:3000
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-muted p-3 text-sm">
-                    <div className="font-medium mb-2">AI Suggestions</div>
-                    <div className="text-muted-foreground text-xs space-y-2">
-                      <div>• Add error handling to API calls</div>
-                      <div>• Consider extracting logic into components</div>
-                      <div>• Optimize bundle size</div>
-                    </div>
-                  </div>
+                    Terminal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("preview")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors ${
+                      viewMode === "preview"
+                        ? "border-foreground text-foreground font-medium"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Monitor className="h-4 w-4" />
+                    Preview
+                  </button>
                 </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="mx-auto w-16 h-16 rounded-full bg-accent flex items-center justify-center">
-                      <Eye className="h-8 w-8 text-muted-foreground" />
+
+                {/* Terminal/Preview Content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {viewMode === "code" ? (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <Terminal className="h-4 w-4" />
+                        Terminal Output
+                      </div>
+                      <div className="rounded-lg bg-muted p-3 font-mono text-xs">
+                        <div className="text-green-500">$ npm run dev</div>
+                        <div className="text-muted-foreground mt-2">
+                          Ready on http://localhost:3000
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-muted p-3 text-sm space-y-3">
+                        <div className="font-medium flex items-center gap-2">
+                          <Wand2 className="h-4 w-4" />
+                          AI Tools
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs text-muted-foreground">
+                            Quick edit selected code with Cmd/Ctrl+K.
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>Provider</span>
+                            <NativeSelect
+                              size="sm"
+                              value={aiProvider}
+                              onChange={(event) =>
+                                setAiProvider(event.target.value as "gemini" | "groq")
+                              }
+                            >
+                              <NativeSelectOption value="gemini">Gemini 2.5 Flash</NativeSelectOption>
+                              <NativeSelectOption value="groq">Groq Llama 3.3 70B</NativeSelectOption>
+                            </NativeSelect>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>Model</span>
+                            <NativeSelect
+                              size="sm"
+                              value={aiModel}
+                              onChange={(event) => setAiModel(event.target.value)}
+                            >
+                              {availableModels.map((modelId: string) => (
+                                <NativeSelectOption key={modelId} value={modelId}>
+                                  {modelId}
+                                </NativeSelectOption>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={openQuickEdit}
+                          >
+                            Edit Selection
+                          </Button>
+                        </div>
+                        <div className="border-t border-border pt-3 space-y-2">
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            <Globe className="h-3.5 w-3.5" />
+                            Firecrawl scrape
+                          </div>
+                          <Input
+                            placeholder="https://example.com"
+                            value={scrapeUrl}
+                            onChange={(event) => setScrapeUrl(event.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={scrapeLoading !== null}
+                              onClick={() => handleScrape("blocking")}
+                            >
+                              {scrapeLoading === "blocking" ? "Scraping..." : "Scrape"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={scrapeLoading !== null}
+                              onClick={() => handleScrape("queue")}
+                            >
+                              {scrapeLoading === "queue" ? "Queueing..." : "Queue"}
+                            </Button>
+                          </div>
+                          {scrapeResult && (
+                            <div className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground max-h-40 overflow-y-auto whitespace-pre-wrap">
+                              {scrapeResult}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-lg font-semibold">Live Preview</div>
-                      <div className="text-sm text-muted-foreground">
-                        Preview will render your app here
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center space-y-3">
+                        <div className="mx-auto w-16 h-16 rounded-full bg-accent flex items-center justify-center">
+                          <Eye className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold">Live Preview</div>
+                          <div className="text-sm text-muted-foreground">
+                            Preview will render your app here
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ResizablePanel>
+          </>
+        ) : (
+          <ResizablePanel defaultSize={100} minSize={100}>
+            <div className="h-full flex flex-col bg-background">
+              <div className="flex items-center justify-between border-b border-border bg-background px-4 py-2">
+                <div className="text-sm text-muted-foreground">AI Chat</div>
+                <div className="text-right text-xs text-muted-foreground">Preview</div>
+              </div>
+              <ResizablePanelGroup orientation="horizontal" className="flex-1">
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <div className="h-full p-4">
+                    <div className="h-full rounded-lg border border-border bg-muted/20 p-4 flex flex-col min-h-0">
+                      <div className="text-xs font-medium text-muted-foreground mb-3">
+                        AI Chat Conversation
+                      </div>
+                      <div className="flex-1 overflow-y-auto text-sm text-muted-foreground">
+                        <div className="rounded-md bg-background/60 p-3">
+                          Start a prompt to see the conversation here.
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
+
+                <ResizablePanel defaultSize={70} minSize={45}>
+                  <div className="h-full p-4">
+                    <div className="h-full rounded-lg border border-border bg-muted/20 p-4 flex items-center justify-center min-h-0">
+                      <div className="text-center space-y-2">
+                        <Eye className="mx-auto h-8 w-8 text-muted-foreground" />
+                        <div className="text-sm font-semibold">Live Preview</div>
+                        <div className="text-xs text-muted-foreground">
+                          Preview will render your app here
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </div>
-          </div>
-        </ResizablePanel>
+          </ResizablePanel>
+        )}
       </ResizablePanelGroup>
+
+      <Dialog open={quickEditOpen} onOpenChange={setQuickEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Edit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              Applies to your current selection.
+            </div>
+            <Textarea
+              value={quickEditInstruction}
+              onChange={(event) => setQuickEditInstruction(event.target.value)}
+              placeholder="e.g. Convert to async/await and add error handling"
+              rows={4}
+            />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Include explanation</span>
+              <Switch
+                checked={quickEditIncludeExplanation}
+                onCheckedChange={setQuickEditIncludeExplanation}
+                size="sm"
+                aria-label="Toggle explanation"
+              />
+            </div>
+            {quickEditExplanation && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+                {quickEditExplanation}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuickEditOpen(false)}
+              disabled={quickEditLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleQuickEditSubmit}
+              disabled={quickEditLoading}
+            >
+              {quickEditLoading ? "Applying..." : "Apply"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
