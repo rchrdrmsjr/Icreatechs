@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       name: "POST /api/ai/inline-suggest",
     },
     async () => {
+      let providerTag: "gemini" | "groq" = "gemini";
       try {
         const body = (await request.json()) as InlineSuggestPayload;
         const {
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
           aiProvider = "gemini",
           model,
         } = body;
+
+        providerTag = aiProvider;
 
         if (!prefix || typeof prefix !== "string") {
           return NextResponse.json(
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
         Sentry.captureException(error, {
           tags: {
             endpoint: "/api/ai/inline-suggest",
-            provider: "gemini",
+            provider: providerTag,
           },
         });
 

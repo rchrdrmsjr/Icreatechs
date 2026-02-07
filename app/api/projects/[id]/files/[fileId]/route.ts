@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/admin";
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
 
-const createStorageClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
-  });
-};
+const createStorageClient = () => createAdminClient();
 
 const normalizePath = (parentPath: string | null, name: string) => {
   const trimmedName = name.trim();
@@ -228,10 +217,9 @@ export async function PATCH(
             path: newPath,
           };
 
-        const storageClient = createStorageClient();
-
         // Move file in storage if it has storage_path and path changed
         if (file.storage_path && newPath !== oldPath) {
+          const storageClient = createStorageClient();
           const oldStoragePath = file.storage_path;
           const newStoragePath = `${id}/${newPath}`;
 
@@ -273,6 +261,7 @@ export async function PATCH(
           if (descendantsError) {
             Sentry.captureException(descendantsError);
           } else if (descendants && descendants.length > 0) {
+            const storageClient = createStorageClient();
             // Update descendant paths and storage_paths
             await Promise.all(
               descendants.map(async (child) => {

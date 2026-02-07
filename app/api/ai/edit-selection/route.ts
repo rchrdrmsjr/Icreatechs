@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       name: "POST /api/ai/edit-selection",
     },
     async () => {
+      let providerTag: "gemini" | "groq" = "gemini";
       try {
         const body = (await request.json()) as EditSelectionPayload;
         const {
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
           includeExplanation = false,
           model,
         } = body;
+
+        providerTag = aiProvider;
 
         if (!selection || typeof selection !== "string") {
           return NextResponse.json(
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest) {
         Sentry.captureException(error, {
           tags: {
             endpoint: "/api/ai/edit-selection",
-            provider: "gemini",
+            provider: providerTag,
           },
         });
 

@@ -449,6 +449,18 @@ export default function ProjectDetailPage() {
   }, [saveActiveFile, saveAllDirtyFiles]);
 
   useEffect(() => {
+    const handleQuickEditKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openQuickEdit();
+      }
+    };
+
+    window.addEventListener("keydown", handleQuickEditKey);
+    return () => window.removeEventListener("keydown", handleQuickEditKey);
+  }, [openQuickEdit]);
+
+  useEffect(() => {
     if (!autoSaveEnabled) return;
     if (!activeFile || !activeFile.isDirty) return;
     if (isSavingActive) return;

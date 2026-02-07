@@ -221,8 +221,15 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
   ({ fileName, value, isDirty, onChange, onSelectionChange }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+    const onChangeRef = useRef(onChange);
+    const onSelectionChangeRef = useRef(onSelectionChange);
 
     const languageExtension = useMemo(() => getLanguageExtension(fileName), [fileName]);
+
+    useEffect(() => {
+      onChangeRef.current = onChange;
+      onSelectionChangeRef.current = onSelectionChange;
+    }, [onChange, onSelectionChange]);
 
     useEffect(() => {
       if (!editorRef.current) return;
@@ -245,16 +252,17 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             minimap(),
             keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
             EditorView.updateListener.of((update) => {
-              if (update.selectionSet && onSelectionChange) {
+              const selectionHandler = onSelectionChangeRef.current;
+              if (update.selectionSet && selectionHandler) {
                 const selection = update.state.selection.main;
                 const selected = update.state.doc.sliceString(
                   selection.from,
                   selection.to,
                 );
-                onSelectionChange(selected);
+                selectionHandler(selected);
               }
               if (update.docChanged) {
-                onChange(update.state.doc.toString());
+                onChangeRef.current(update.state.doc.toString());
               }
             }),
           ],
@@ -323,8 +331,13 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       const selected = getSelection();
       if (!selected) return;
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(selected);
-        return;
+        try {
+          await navigator.clipboard.writeText(selected);
+          return;
+        } catch {
+          document.execCommand("copy");
+          return;
+        }
       }
       document.execCommand("copy");
     };
@@ -335,12 +348,21 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       const selection = view.state.selection.main;
       if (selection.empty) return;
       const selected = getSelection();
+      let wroteToClipboard = false;
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(selected);
+        try {
+          await navigator.clipboard.writeText(selected);
+          wroteToClipboard = true;
+        } catch {
+          wroteToClipboard = document.execCommand("cut");
+        }
       } else {
-        document.execCommand("cut");
+        wroteToClipboard = document.execCommand("cut");
       }
-      view.dispatch({ changes: { from: selection.from, to: selection.to, insert: "" } });
+
+      if (wroteToClipboard) {
+        view.dispatch({ changes: { from: selection.from, to: selection.to, insert: "" } });
+      }
     };
 
     const pasteClipboard = async () => {
@@ -348,7 +370,12 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       if (!view) return;
       let text = "";
       if (navigator.clipboard?.readText) {
-        text = await navigator.clipboard.readText();
+        try {
+          text = await navigator.clipboard.readText();
+        } catch {
+          document.execCommand("paste");
+          return;
+        }
       }
       if (!text) {
         document.execCommand("paste");
