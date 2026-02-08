@@ -19,7 +19,7 @@ export async function GET(
     async () => {
       try {
         const { id } = await params;
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const supabase = createClient(cookieStore);
 
         const {

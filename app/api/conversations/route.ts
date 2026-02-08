@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const supabase = createClient(cookieStore);
 
         const {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     },
     async () => {
       try {
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const supabase = createClient(cookieStore);
 
         const {
@@ -112,9 +112,21 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const body = await request.json();
-        const projectId = body?.projectId;
-        const title = typeof body?.title === "string" ? body.title.trim() : "";
+        let body: Record<string, unknown> = {};
+        try {
+          const parsed = await request.json();
+          if (parsed && typeof parsed === "object") {
+            body = parsed as Record<string, unknown>;
+          }
+        } catch (error) {
+          return NextResponse.json(
+            { error: "Invalid JSON body" },
+            { status: 400 },
+          );
+        }
+        const projectId =
+          typeof body.projectId === "string" ? body.projectId : "";
+        const title = typeof body.title === "string" ? body.title.trim() : "";
 
         if (!projectId) {
           return NextResponse.json(

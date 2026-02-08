@@ -55,7 +55,9 @@ export const ConversationPanel = ({
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [sending, setSending] = useState(false);
   const [pastConversationsOpen, setPastConversationsOpen] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeConversation = useMemo(
     () =>
@@ -138,6 +140,13 @@ export const ConversationPanel = ({
     }
   }, [activeConversation?.id, loadMessages]);
 
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -243,6 +252,23 @@ export const ConversationPanel = ({
     loadMessages,
   ]);
 
+  const handleCopyMessage = useCallback(async (message: ConversationMessage) => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedMessageId(message.id);
+      toast.success("Copied to clipboard");
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+      copyResetTimeoutRef.current = setTimeout(() => {
+        setCopiedMessageId((current) => (current === message.id ? null : current));
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to copy message", error);
+      toast.error("Failed to copy message");
+    }
+  }, []);
+
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-background">
       <PastConversationsDialog
@@ -335,8 +361,10 @@ export const ConversationPanel = ({
                       size="icon-xs"
                       variant="ghost"
                       className="ml-2"
-                      onClick={() => navigator.clipboard.writeText(message.content)}
-                      title="Copy response"
+                      onClick={() => void handleCopyMessage(message)}
+                      title={
+                        copiedMessageId === message.id ? "Copied" : "Copy response"
+                      }
                     >
                       <Copy className="size-3.5" />
                     </Button>

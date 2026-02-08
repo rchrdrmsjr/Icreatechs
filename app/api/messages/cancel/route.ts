@@ -98,6 +98,30 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: true, cancelled: false });
         }
 
+        const messageIds = processingMessages.map((msg) => msg.id);
+
+        const { error: updateError, status: updateStatus } = await supabase
+          .from("messages")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .in("id", messageIds);
+
+        if (updateError || (updateStatus && updateStatus >= 400)) {
+          console.error("Failed to cancel processing messages", {
+            error: updateError,
+            status: updateStatus,
+          });
+          Sentry.captureException(
+            updateError ??
+              new Error(
+                `Failed to cancel processing messages (status ${updateStatus})`,
+              ),
+          );
+          return NextResponse.json(
+            { error: "Failed to cancel messages" },
+            { status: 500 },
+          );
+        }
+
         await Promise.all(
           processingMessages.map(async (msg) => {
             await inngest.send({
@@ -107,18 +131,10 @@ export async function POST(request: NextRequest) {
           }),
         );
 
-        await supabase
-          .from("messages")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
-          .in(
-            "id",
-            processingMessages.map((msg) => msg.id),
-          );
-
         return NextResponse.json({
           success: true,
           cancelled: true,
-          messageIds: processingMessages.map((msg) => msg.id),
+          messageIds,
         });
       } catch (error) {
         Sentry.captureException(error);
