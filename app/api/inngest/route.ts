@@ -6,9 +6,10 @@ import {
   generateGroqText,
   scrapeWebsite,
   scrapeAndAnalyze,
+  processMessage,
 } from "@/inngest/functions";
 
-// Serve Inngest functions: helloWorld, generateAIText, generateGroqText, scrapeWebsite, scrapeAndAnalyze
+// Serve Inngest functions: helloWorld, generateAIText, generateGroqText, scrapeWebsite, scrapeAndAnalyze, processMessage
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
@@ -17,5 +18,6 @@ export const { GET, POST, PUT } = serve({
     generateGroqText,
     scrapeWebsite,
     scrapeAndAnalyze,
+    processMessage,
   ],
 });

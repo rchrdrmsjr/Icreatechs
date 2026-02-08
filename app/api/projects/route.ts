@@ -30,7 +30,14 @@ export async function GET() {
 
         // Try to get cached projects
         const cacheKey = `projects:user:${user.id}`;
-        const cached = await cache.get(cacheKey);
+        let cached: unknown = null;
+        try {
+          cached = await cache.get(cacheKey);
+        } catch (cacheError) {
+          Sentry.captureException(cacheError, {
+            data: { operation: "projects_cache_get", userId: user.id },
+          });
+        }
 
         if (cached) {
           Sentry.logger.info("Projects cache hit", { userId: user.id });
@@ -82,11 +89,17 @@ export async function GET() {
 
         // Cache the projects for 5 minutes
         if (projects && projects.length > 0) {
-          await cache.set(cacheKey, projects, 300);
-          Sentry.logger.info("Projects cached", {
-            userId: user.id,
-            count: projects.length,
-          });
+          try {
+            await cache.set(cacheKey, projects, 300);
+            Sentry.logger.info("Projects cached", {
+              userId: user.id,
+              count: projects.length,
+            });
+          } catch (cacheError) {
+            Sentry.captureException(cacheError, {
+              data: { operation: "projects_cache_set", userId: user.id },
+            });
+          }
         }
 
         return NextResponse.json({ projects: projects || [], cached: false });
